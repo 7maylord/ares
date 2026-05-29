@@ -1,21 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class AnalyzerService {
   private readonly logger = new Logger(AnalyzerService.name);
+  private readonly analyzerUrl: string;
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly httpService: HttpService,
+  ) {
+    const url = this.configService.get<string>('ANALYZER_SERVICE_URL');
+    if (!url) {
+      throw new Error('ANALYZER_SERVICE_URL environment variable is not defined');
+    }
+    this.analyzerUrl = url;
+  }
 
-  async analyzeContract(contractAddress: string): Promise<any> {
+  async analyzeContract(contractAddress: string, sourceCode?: string): Promise<any> {
     this.logger.log(`Sending contract ${contractAddress} to Python Analyzer...`);
     try {
       const response = await firstValueFrom(
-        this.httpService.post('http://localhost:8000/analyze', {
+        this.httpService.post(`${this.analyzerUrl}/analyze`, {
           contract_address: contractAddress,
-          // Normally we fetch bytecode here and send it, omitting for brevity
-          bytecode: '0x1234'
+          source_code: sourceCode || null,
+          bytecode: '0x1234',
         }),
       );
       return response.data;

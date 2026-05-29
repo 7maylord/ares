@@ -58,3 +58,6 @@ venv/
 *.key
 secrets/
 config.staging.json
+
+# Databases
+**/chroma_db/
