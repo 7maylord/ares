@@ -1,5 +1,6 @@
 prd.md
-/smart
+
+
 # Environment variables
 .env
 .env.local

@@ -1,10 +1,10 @@
-# Autonomous Bug Bounty Hunter (ABBH) – PRD & TRD
+# Ares (Autonomous Bug Bounty Hunter) – PRD & TRD
 
 ## Product Requirements Document (PRD)
 
 ### 1. Executive Summary
 
-**Autonomous Bug Bounty Hunter (ABBH)** is a fully autonomous AI agent that continuously scans newly deployed smart contracts on Mantle testnet for security vulnerabilities, generates proof-of-concept exploits, and claims bounties — all without human intervention. It turns security auditing into a permissionless, 24/7 competitive market.
+**Ares** is a fully autonomous AI agent that continuously scans newly deployed smart contracts on Mantle testnet for security vulnerabilities, generates proof-of-concept exploits, and claims bounties — all without human intervention. It turns security auditing into a permissionless, 24/7 competitive market.
 
 **Core Value Proposition:**  
 Protocols get continuous, low-cost security coverage. The agent (or a DAO-owned swarm) earns yield by hunting bugs. Mantle’s high throughput and low fees make real-time, on-chain fuzzing economically viable.
@@ -13,7 +13,7 @@ Protocols get continuous, low-cost security coverage. The agent (or a DAO-owned 
 
 > *“A tireless white-hat hacker that sleeps only when the network does.”*
 
-ABBH democratizes security: any protocol can deploy a bounty pool, and any agent can compete to find flaws. Over time, a reputation economy emerges where the most effective agents earn more trust and higher bounties.
+Ares democratizes security: any protocol can deploy a bounty pool, and any agent can compete to find flaws. Over time, a reputation economy emerges where the most effective agents earn more trust and higher bounties.
 
 ### 3. Target Audience
 
@@ -21,7 +21,7 @@ ABBH democratizes security: any protocol can deploy a bounty pool, and any agent
 |---------|-------------|
 | **Protocol Developers** | Deploy smart contracts and want continuous, automated security monitoring without paying expensive audit firms. |
 | **DAO Treasuries** | Allocate bounty budgets to attract autonomous hunters. |
-| **Agent Operators** | Individuals or DAOs that stake capital to deploy and maintain ABBH agents, sharing in bounty rewards. |
+| **Agent Operators** | Individuals or DAOs that stake capital to deploy and maintain Ares agents, sharing in bounty rewards. |
 | **Validators / Judges** | Decentralized voters who verify contested exploit submissions (fallback mechanism). |
 
 ### 4. Core Features (MVP)
@@ -43,7 +43,7 @@ ABBH democratizes security: any protocol can deploy a bounty pool, and any agent
 3. Pool emits `BountyCreated` event – agents begin monitoring.
 
 #### 5.2 Agent Scans & Reports
-1. ABBH agent detects new contract or active bounty.
+1. Ares agent detects new contract or active bounty.
 2. Agent runs analysis pipeline (static → symbolic → fuzzing → LLM).
 3. If vulnerability found, agent attempts to generate a PoC transaction.
 4. Agent submits `Finding` to the pool: `(contract, vulnerabilityType, PoC_tx_data, confidenceScore)`.
@@ -67,7 +67,7 @@ ABBH democratizes security: any protocol can deploy a bounty pool, and any agent
 
 - **Total bounties claimed (weekly)** – target: 10+ after 3 months
 - **Average time-to-submission** – target: < 10 minutes
-- **Protocols using ABBH bounties** – target: 50 after 6 months
+- **Protocols using Ares bounties** – target: 50 after 6 months
 - **Agent operator ROI** – target: > 20% annualized
 
 ### 8. Roadmap (12 weeks)
@@ -88,7 +88,7 @@ ABBH democratizes security: any protocol can deploy a bounty pool, and any agent
 
 ```text
 [On-Chain]          [Off-Chain Agent]                                           [Storage]
-Mantle L2           ABBH Orchestrator (NestJS) <-> Analyzer Service (Python)    IPFS / Arweave
+Mantle L2           Ares Orchestrator (NestJS) <-> Analyzer Service (Python)    IPFS / Arweave
     |                           |                                 |
     v                           v                                 v
 ContractDeployed event ---> Deployment Monitor --->         Fetches bytecode
@@ -167,7 +167,7 @@ function updateReputation(address agent, bool success) external onlyRole(JUDGE_R
 | **Static Analyzer** | Slither (integrated via JSON-RPC) | Runs ~50 detectors for common bugs (reentrancy, timestamp dependence, etc.). |
 | **Symbolic Executor** | Manticore or hevm | Explores all execution paths, identifies assertion violations. |
 | **Fuzzing Engine** | Echidna (adapted for Mantle) | Generates random transactions, uses coverage guidance. |
-| **LLM Reasoner** | Fine-tuned CodeLlama-34B (or GPT-4 API) | Analyzes source code (if available) to find logic flaws. |
+| **LLM Reasoner (RAG)** | GPT-4 API + Solodit Vector DB | Uses Retrieval-Augmented Generation with thousands of past audit reports (Solodit/Code4rena) to spot complex logic flaws beyond static analysis. |
 
 **Integration:**
 The pipeline is orchestrated by a control script. Each stage runs in parallel; if any stage flags a potential vulnerability, the result is passed to the Exploit Validator.
@@ -178,11 +178,11 @@ The pipeline is orchestrated by a control script. Each stage runs in parallel; i
 - Uses symbolic execution to fill concrete values (e.g., the exact ETH amount that triggers the overflow).
 - Outputs a raw transaction data blob that can be submitted to `BountyPool.submitFinding()`.
 
-#### 3.4 LLM Fine-Tuning Details
-- **Base model:** CodeLlama-34B or GPT-4 (if API budget allows).
-- **Dataset:** SmartBugs Wild + Smart Contract Vulnerability Dataset (SCVD) + DAppSCAN. Each sample is `(source_code, vulnerability_type, location, description)`.
-- **Fine-tuning method:** LoRA (Low-Rank Adaptation) to reduce memory footprint.
-- **Inference:** The LLM runs on a GPU instance; for each contract, it receives a prompt asking “List all possible vulnerabilities with line numbers and confidence.” Output is parsed and passed to the validator.
+#### 3.4 LLM RAG Details
+- **Base model:** GPT-4o or Claude 3.5 Sonnet.
+- **Knowledge Base:** Thousands of audit findings scraped from **Solodit**, Code4rena, and Sherlock.
+- **Vector Database:** Pinecone or Qdrant storing structured chunks of (vulnerable_code, vulnerability_type, remediation).
+- **Inference Workflow:** When a new contract is analyzed, Ares chunks the source code, queries the Vector DB for similar past vulnerabilities, and feeds these historical examples into the LLM context. This provides Ares with deep "security intuition" to catch zero-day logic flaws that Slither cannot detect.
 
 ### 4. Verification Mechanism
 
@@ -227,8 +227,8 @@ If automatic verification fails (e.g., non-deterministic outcome), a panel of 7 
 ### 9. Developer Setup
 
 ```bash
-git clone https://github.com/your-org/abbh-agent
-cd abbh-agent
+git clone https://github.com/your-org/ares-agent
+cd ares-agent
 
 # 1. Setup Orchestrator (NestJS)
 npm install
