@@ -4,10 +4,10 @@
 
 ### 1. Executive Summary
 
-**Autonomous Bug Bounty Hunter (ABBH)** is a fully autonomous AI agent that continuously scans newly deployed smart contracts on Somnia for security vulnerabilities, generates proof-of-concept exploits, and claims bounties — all without human intervention. It turns security auditing into a permissionless, 24/7 competitive market.
+**Autonomous Bug Bounty Hunter (ABBH)** is a fully autonomous AI agent that continuously scans newly deployed smart contracts on Mantle testnet for security vulnerabilities, generates proof-of-concept exploits, and claims bounties — all without human intervention. It turns security auditing into a permissionless, 24/7 competitive market.
 
 **Core Value Proposition:**  
-Protocols get continuous, low-cost security coverage. The agent (or a DAO-owned swarm) earns yield by hunting bugs. Somnia’s high throughput and low fees make real-time, on-chain fuzzing economically viable.
+Protocols get continuous, low-cost security coverage. The agent (or a DAO-owned swarm) earns yield by hunting bugs. Mantle’s high throughput and low fees make real-time, on-chain fuzzing economically viable.
 
 ### 2. Product Vision
 
@@ -28,7 +28,7 @@ ABBH democratizes security: any protocol can deploy a bounty pool, and any agent
 
 | Feature | Description |
 |---------|-------------|
-| **Deployment Monitor** | Listens for `ContractDeployed` events on Somnia, filters by whitelist or bounty pool presence. |
+| **Deployment Monitor** | Listens for `ContractDeployed` events on Mantle testnet, filters by whitelist or bounty pool presence. |
 | **Multi-Stage Analyzer** | Static analysis (pattern matching), symbolic execution, fuzzing, and LLM reasoning. |
 | **Exploit Validator** | Automatically constructs a PoC transaction that demonstrates the vulnerability. |
 | **Bounty Escrow Contract** | Holds funds, verifies submissions (via on-chain replay or validator vote), and pays out. |
@@ -49,7 +49,7 @@ ABBH democratizes security: any protocol can deploy a bounty pool, and any agent
 4. Agent submits `Finding` to the pool: `(contract, vulnerabilityType, PoC_tx_data, confidenceScore)`.
 
 #### 5.3 Verification & Payout
-- **Automatic verification (default):** The `BountyEscrow` contract forks the target contract (using Somnia’s `eth_call` with state override) and executes the PoC. If the transaction changes state as expected (e.g., drains funds), verification passes.
+- **Automatic verification (default):** The `BountyEscrow` contract forks the target contract (using Mantle’s `eth_call` with state override) and executes the PoC. If the transaction changes state as expected (e.g., drains funds), verification passes.
 - **Manual verification (fallback):** If automatic verification is ambiguous, a random set of 5–9 validator agents (or human jurors) vote within 24 hours.
 - Upon verification, reward is transferred to agent’s treasury. Agent’s reputation increases.
 
@@ -58,7 +58,7 @@ ABBH democratizes security: any protocol can deploy a bounty pool, and any agent
 | Requirement | Target |
 |-------------|--------|
 | Time from contract deployment to submission | < 5 minutes (for simple vulns) |
-| Gas cost per full scan (static+fuzz+LLM) | < $0.50 (on Somnia) |
+| Gas cost per full scan (static+fuzz+LLM) | < $0.50 (on Mantle testnet) |
 | False positive rate (submissions rejected) | < 10% |
 | Uptime (agent daemon) | 99.9% |
 | Number of contracts monitored simultaneously | > 10,000 |
@@ -87,8 +87,8 @@ ABBH democratizes security: any protocol can deploy a bounty pool, and any agent
 ### 1. System Architecture Overview
 
 ```text
-[On-Chain]          [Off-Chain Agent]                       [Storage]
-Somnia L1           ABBH Daemon (Node.js/Python)            IPFS / Arweave
+[On-Chain]          [Off-Chain Agent]                                           [Storage]
+Mantle L2           ABBH Orchestrator (NestJS) <-> Analyzer Service (Python)    IPFS / Arweave
     |                           |                                 |
     v                           v                                 v
 ContractDeployed event ---> Deployment Monitor --->         Fetches bytecode
@@ -100,7 +100,7 @@ BountyPool.sol <---         Submission Tx <---              Analyzer Pipeline
 BountyEscrow.sol <---       Verification ---                Exploit Validator (PoC generation)
 ```
 
-**Key Somnia Features Used:**
+**Key Mantle Features Used:**
 - **Reactivity** → instant trigger on contract deployment.
 - **Low gas fees** → frequent scanning and submission tx cost pennies.
 - **Parallel EVM** → run multiple analyzer instances concurrently.
@@ -131,11 +131,11 @@ function claimReward(uint256 bountyId) external; // called after verification
 
 #### 2.2 BountyEscrow.sol
 `verifyAndPay(uint256 bountyId, address agent)`
-Uses Somnia’s `eth_call` with a cloned environment to execute `pocData` against the target contract. If the post-state matches the expected invariant violation (e.g., agent balance increased by >0), reward is transferred.
+Uses Mantle’s `eth_call` with a cloned environment to execute `pocData` against the target contract. If the post-state matches the expected invariant violation (e.g., agent balance increased by >0), reward is transferred.
 
 ```solidity
 function _simulateExploit(address target, bytes calldata poc) internal returns (bool success) {
-    // Use Somnia's fork simulation (similar to eth_call but with state changes)
+    // Use Mantle's fork simulation (similar to eth_call but with state changes)
     (bool ok, bytes memory ret) = target.staticcall(poc); // simplified
     // Check if exploit achieved goal (e.g., balance changed)
     return ok && _checkInvariantBroken(target);
@@ -153,18 +153,20 @@ function updateReputation(address agent, bool success) external onlyRole(JUDGE_R
 
 ### 3. Off-Chain Agent Components
 
-#### 3.1 Deployment Monitor (Node.js + Somnia RPC)
+#### 3.1 Orchestrator & Deployment Monitor (NestJS + Mantle RPC)
 - Subscribes to `newHeads` filters for `ContractDeployed` logs.
 - Maintains a set of active bounty targets (from `BountyPool` events).
 - Pushes each new target to a job queue.
+- Manages database, reputation ledger, and transaction submissions to Mantle.
+- Delegates heavy analysis tasks to the Analyzer Microservice.
 
-#### 3.2 Analyzer Pipeline (Python / Rust)
+#### 3.2 Analyzer Microservice (Python)
 
 | Stage | Technology | Description |
 | :--- | :--- | :--- |
 | **Static Analyzer** | Slither (integrated via JSON-RPC) | Runs ~50 detectors for common bugs (reentrancy, timestamp dependence, etc.). |
 | **Symbolic Executor** | Manticore or hevm | Explores all execution paths, identifies assertion violations. |
-| **Fuzzing Engine** | Echidna (adapted for Somnia) | Generates random transactions, uses coverage guidance. |
+| **Fuzzing Engine** | Echidna (adapted for Mantle) | Generates random transactions, uses coverage guidance. |
 | **LLM Reasoner** | Fine-tuned CodeLlama-34B (or GPT-4 API) | Analyzes source code (if available) to find logic flaws. |
 
 **Integration:**
@@ -185,17 +187,17 @@ The pipeline is orchestrated by a control script. Each stage runs in parallel; i
 ### 4. Verification Mechanism
 
 **Primary (automatic):**
-`BountyEscrow.sol` calls a privileged off-chain oracle (or a Somnia precompile) that runs the PoC in a sandboxed EVM. This can be implemented using Somnia’s `static_call` with state capture – no gas cost for the actual exploit.
+`BountyEscrow.sol` calls a privileged off-chain oracle (or a Mantle precompile) that runs the PoC in a sandboxed EVM. This can be implemented using Mantle’s `static_call` with state capture – no gas cost for the actual exploit.
 
 **Fallback (decentralized):**
-If automatic verification fails (e.g., non-deterministic outcome), a panel of 7 randomly selected reputation-weighted agents votes on the finding. Voting is done via a commit-reveal scheme on Somnia. This ensures liveness and decentralization.
+If automatic verification fails (e.g., non-deterministic outcome), a panel of 7 randomly selected reputation-weighted agents votes on the finding. Voting is done via a commit-reveal scheme on Mantle testnet. This ensures liveness and decentralization.
 
-### 5. Somnia-Specific Optimizations
+### 5. Mantle-Specific Optimizations
 
-| Challenge | Somnia Solution |
+| Challenge | Mantle Solution |
 | :--- | :--- |
-| **Running fuzzing on-chain is expensive.** | Fuzzing runs off-chain; only the final PoC submission is on-chain. Somnia’s low fees still make this economical for the agent operator. |
-| **Need to simulate exploit without affecting real state.** | Somnia’s `eth_call` with state override allows safe replay. |
+| **Running fuzzing on-chain is expensive.** | Fuzzing runs off-chain; only the final PoC submission is on-chain. Mantle’s low fees still make this economical for the agent operator. |
+| **Need to simulate exploit without affecting real state.** | Mantle’s `eth_call` with state override allows safe replay. |
 | **Many contracts to monitor.** | Parallel EVM lets the agent run multiple analyzer instances in separate threads, each scanning different contracts. |
 | **Real-time reaction to new contracts.** | Reactivity (event-driven execution) triggers the agent instantly. |
 
@@ -217,8 +219,8 @@ If automatic verification fails (e.g., non-deterministic outcome), a panel of 7 
 
 ### 8. Deployment & Monitoring
 
-- **Testnet:** Somnia DevNet (STT faucet for gas).
-- **Mainnet:** Somnia Mainnet (SOMI tokens).
+- **Testnet:** Mantle Testnet (MNT faucet for gas).
+- **Mainnet:** Mantle Mainnet (MNT tokens).
 - **Agent deployment:** Docker container running on a cloud VM (or decentralized compute like Akash).
 - **Monitoring:** Prometheus metrics (scans per second, findings per hour, false positive rate). Alerts on agent downtime.
 
@@ -227,23 +229,22 @@ If automatic verification fails (e.g., non-deterministic outcome), a panel of 7 
 ```bash
 git clone https://github.com/your-org/abbh-agent
 cd abbh-agent
+
+# 1. Setup Orchestrator (NestJS)
 npm install
 npx hardhat compile
+cp .env.example .env
+npm run start:dev
 
-# Set up Python virtual env for analyzers
+# 2. Setup Analyzer Microservice (Python)
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
-# Configure .env
-cp .env.example .env
-
-# Run agent
-python main.py --network somnia-testnet
+python main.py
 ```
 
 **Environment variables:**
-- `SOMNIA_RPC_URL`
+- `MANTLE_RPC_URL`
 - `PRIVATE_KEY`
 - `OPENAI_API_KEY` (if using GPT-4)
 - `IPFS_GATEWAY`
@@ -260,7 +261,7 @@ python main.py --network somnia-testnet
 - Denial of service (unbounded loop)
 
 #### B. References
-- Somnia Agentic L1 Docs
+- Mantle Docs
 - Slither Static Analyzer
 - Echidna Fuzzer
 - SmartBugs Wild Dataset
