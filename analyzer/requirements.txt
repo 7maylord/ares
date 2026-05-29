@@ -1,0 +1,5 @@
+fastapi==0.111.0
+uvicorn==0.29.0
+pydantic==2.7.1
+slither-analyzer==0.9.3
+solc-select==1.0.4
