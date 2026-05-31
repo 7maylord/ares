@@ -241,6 +241,76 @@ contract BountyEscrowTest is Test {
     }
 
     // ══════════════════════════════════════════════
+    //  SET BOUNTY POOL
+    // ══════════════════════════════════════════════
+
+    function test_SetBountyPool() public {
+        // Deploy a new pool to set
+        vm.startPrank(admin);
+        BountyPool newPool = new BountyPool(admin, address(ledger));
+        escrow.setBountyPool(address(newPool));
+        vm.stopPrank();
+
+        assertEq(address(escrow.bountyPool()), address(newPool));
+    }
+
+    function test_RevertWhen_SetBountyPool_ZeroAddress() public {
+        vm.prank(admin);
+        vm.expectRevert(BountyEscrow.ZeroAddress.selector);
+        escrow.setBountyPool(address(0));
+    }
+
+    function test_RevertWhen_NonAdminSetsBountyPool() public {
+        vm.prank(agent1);
+        vm.expectRevert();
+        escrow.setBountyPool(address(pool));
+    }
+
+    // ══════════════════════════════════════════════
+    //  CONSTRUCTOR ZERO-ADDRESS CHECKS
+    // ══════════════════════════════════════════════
+
+    function test_RevertWhen_ConstructorZeroAdmin() public {
+        vm.expectRevert(BountyEscrow.ZeroAddress.selector);
+        new BountyEscrow(address(0), address(pool));
+    }
+
+    function test_RevertWhen_ConstructorZeroBountyPool() public {
+        vm.expectRevert(BountyEscrow.ZeroAddress.selector);
+        new BountyEscrow(admin, address(0));
+    }
+
+    // ══════════════════════════════════════════════
+    //  VERIFY / REJECT NON-EXISTENT FINDINGS
+    // ══════════════════════════════════════════════
+
+    function test_RevertWhen_VerifyNonExistentFinding() public {
+        // findingId 999 was never created → agent == address(0) → InvalidFinding
+        vm.prank(verifier);
+        vm.expectRevert(abi.encodeWithSelector(BountyPool.InvalidFinding.selector, 999));
+        escrow.verify(999);
+    }
+
+    function test_RevertWhen_RejectNonExistentFinding() public {
+        vm.prank(verifier);
+        vm.expectRevert(abi.encodeWithSelector(BountyPool.InvalidFinding.selector, 999));
+        escrow.reject(999);
+    }
+
+    // ══════════════════════════════════════════════
+    //  REJECT EMITS EVENT
+    // ══════════════════════════════════════════════
+
+    function test_RejectFinding_EmitsEvents() public {
+        (, uint256 findingId) = _createBountyAndSubmit(agent1);
+
+        vm.prank(verifier);
+        vm.expectEmit(true, false, false, true);
+        emit BountyEscrow.VerificationFailed(findingId);
+        escrow.reject(findingId);
+    }
+
+    // ══════════════════════════════════════════════
     //  FULL END-TO-END FLOW
     // ══════════════════════════════════════════════
 
