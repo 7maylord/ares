@@ -8,8 +8,8 @@ import {BountyEscrow} from "../src/BountyEscrow.sol";
 
 contract DeployAres is Script {
     function run() external {
-        // Read private key from environment or use a default test key if not provided (for local anvil testing)
-        uint256 deployerPrivateKey = vm.envOr("PRIVATE_KEY", uint256(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80));
+        // Read private key from environment
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
 
         console.log("Deploying Ares contracts with deployer:", deployerAddress);
