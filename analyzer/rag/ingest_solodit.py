@@ -184,5 +184,66 @@ def ingest_seed_findings():
     return collection
 
 
-if __name__ == "__main__":
+def ingest_all() -> None:
+    """
+    Orchestrator: run all ingestion sources in sequence.
+
+    Order:
+      1. Seed findings (fast, always available)
+      2. tintinweb/smart-contract-vulndb (machine-readable JSON)
+      3. GitHub audit repos (Markdown + PDF)
+      4. Solodit API (live, rate-limited)
+    """
+    import logging
+    from pathlib import Path
+
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    from chromadb.utils import embedding_functions
+    from analyzer.rag import ingest_vulndb, ingest_github_reports, ingest_solodit_api
+
+    db_path = Path(DB_DIR)
+    db_path.mkdir(parents=True, exist_ok=True)
+    client = get_chroma_client()
+    ef = embedding_functions.DefaultEmbeddingFunction()
+    collection = client.get_or_create_collection(
+        name="audit_findings",
+        embedding_function=ef,
+        metadata={"description": "Smart contract audit findings from all sources"},
+    )
+
+    logger.info("=== Step 1: Seed findings ===")
     ingest_seed_findings()
+
+    logger.info("=== Step 2: tintinweb/smart-contract-vulndb ===")
+    try:
+        count = ingest_vulndb.ingest(collection)
+        logger.info(f"vulndb: {count} findings")
+    except Exception as e:
+        logger.error(f"vulndb ingestion failed: {e}")
+
+    logger.info("=== Step 3: GitHub audit repos ===")
+    try:
+        count = ingest_github_reports.ingest(collection)
+        logger.info(f"github reports: {count} findings")
+    except Exception as e:
+        logger.error(f"GitHub ingestion failed: {e}")
+
+    logger.info("=== Step 4: Solodit API ===")
+    try:
+        count = ingest_solodit_api.ingest(collection)
+        logger.info(f"solodit api: {count} findings")
+    except Exception as e:
+        logger.error(f"Solodit API ingestion failed: {e}")
+
+    final_count = collection.count()
+    logger.info(f"✅ Ingestion complete — total documents in ChromaDB: {final_count}")
+
+
+if __name__ == "__main__":
+    import sys
+    if "--all" in sys.argv:
+        ingest_all()
+    else:
+        ingest_seed_findings()
