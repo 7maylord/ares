@@ -39,31 +39,30 @@ export class ContractFetcherService {
   }
 
   /**
-   * Fetch contract code using a two-step strategy:
-   * 1. Try Mantlescan API for verified source code
-   * 2. Fall back to RPC eth_getCode for raw bytecode
+   * Hybrid fetch: always retrieve both verified source (if available) AND
+   * deployed bytecode from RPC. Having both lets the analyzer cross-validate
+   * that the deployed bytecode actually matches the verified source — a real
+   * attack vector where the two diverge.
    */
   async fetchContract(contractAddress: string): Promise<FetchedContract> {
     this.logger.log(`Fetching contract code for ${contractAddress}...`);
 
-    // Step 1: Try verified source from Mantlescan
-    if (this.mantlescanApiKey) {
-      const verified = await this.fetchVerifiedSource(contractAddress);
-      if (verified) {
-        this.logger.log(`✅ Found verified source for ${contractAddress} (${verified.contractName})`);
-        return verified;
-      }
-      this.logger.log(`Contract ${contractAddress} is not verified on Mantlescan`);
+    // Always fetch bytecode from RPC regardless of verification status
+    const [verifiedResult, bytecode] = await Promise.all([
+      this.mantlescanApiKey ? this.fetchVerifiedSource(contractAddress) : Promise.resolve(null),
+      this.fetchBytecodeFromRpc(contractAddress),
+    ]);
+
+    if (verifiedResult) {
+      this.logger.log(
+        `✅ Verified source for ${contractAddress} (${verifiedResult.contractName}) + bytecode`
+      );
+      return { ...verifiedResult, bytecode: bytecode ?? undefined };
     }
 
-    // Step 2: Fall back to raw bytecode from RPC
-    const bytecode = await this.fetchBytecodeFromRpc(contractAddress);
     if (bytecode && bytecode !== '0x') {
-      this.logger.log(`📦 Fetched raw bytecode for ${contractAddress} (${bytecode.length} chars)`);
-      return {
-        bytecode,
-        isVerified: false,
-      };
+      this.logger.log(`📦 No verified source — raw bytecode only for ${contractAddress} (${bytecode.length} chars)`);
+      return { bytecode, isVerified: false };
     }
 
     this.logger.warn(`⚠️ No code found at ${contractAddress} — may be an EOA, not a contract`);
