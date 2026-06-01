@@ -30,10 +30,10 @@ class AnalyzeResponse(BaseModel):
 slither_runner = SlitherRunner()
 # Lazy load LLM RAG runner only if API key is present, to prevent crash on startup if missing
 try:
-    if os.getenv("OPENAI_API_KEY"):
+    if os.getenv("ANTHROPIC_API_KEY"):
         llm_rag_runner = LLMRagRunner()
     else:
-        logger.warning("OPENAI_API_KEY not found in environment. LLM RAG analysis will be disabled.")
+        logger.warning("ANTHROPIC_API_KEY not found in environment. LLM RAG analysis will be disabled.")
         llm_rag_runner = None
 except Exception as e:
     logger.error(f"Failed to initialize LLM RAG runner: {e}")

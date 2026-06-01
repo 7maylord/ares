@@ -250,7 +250,7 @@ export default function Dashboard() {
 
         // Simulate step 3: RAG LLM Reasoning
         setTimeout(() => {
-          setSimStep("Slither completed. Running OpenAI RAG model using Solodit database context...");
+          setSimStep("Slither completed. Running Anthropic RAG model using Solodit database context...");
           
           setTimeout(() => {
             setSimStep("Vulnerability identified! Generating Proof of Concept (PoC) transaction payload...");

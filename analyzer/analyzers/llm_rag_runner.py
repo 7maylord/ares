@@ -8,7 +8,7 @@ to reason about potential vulnerabilities in a target contract.
 import os
 import chromadb
 from chromadb.utils import embedding_functions
-from openai import OpenAI
+import anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -39,12 +39,13 @@ Output format (JSON array):
 
 If no vulnerabilities are found, return an empty array: []
 Be thorough. Check for: reentrancy, access control, oracle manipulation, integer issues, 
-unchecked return values, front-running, storage collisions, flash loan attacks, and logic errors."""
+unchecked return values, front-running, storage collisions, flash loan attacks, and logic errors.
+IMPORTANT: Return ONLY valid JSON, do not include markdown code blocks or any other text."""
 
 
 class LLMRagRunner:
     def __init__(self):
-        self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         self.chroma_client = None
         self.collection = None
         self._init_vectordb()
@@ -103,19 +104,28 @@ Return your analysis as a JSON array."""
 
         # Step 3: Call LLM
         try:
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
+            response = self.anthropic_client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                system=SYSTEM_PROMPT,
                 messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.1,  # Low temp for deterministic security analysis
-                response_format={"type": "json_object"},
+                temperature=0.1,
+                max_tokens=4000
             )
 
             import json
-            content = response.choices[0].message.content
-            parsed = json.loads(content)
+            content = response.content[0].text.strip()
+            
+            # Anthropic sometimes includes markdown formatting despite being told not to
+            if content.startswith("```json"):
+                content = content[7:]
+            elif content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            
+            parsed = json.loads(content.strip())
 
             # Handle both {"vulnerabilities": [...]} and direct [...]
             if isinstance(parsed, dict):
