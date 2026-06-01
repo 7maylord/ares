@@ -19,14 +19,18 @@ export class AnalyzerService {
     this.analyzerUrl = url;
   }
 
-  async analyzeContract(contractAddress: string, sourceCode?: string): Promise<any> {
+  async analyzeContract(
+    contractAddress: string,
+    sourceCode?: string,
+    bytecode?: string,
+  ): Promise<any> {
     this.logger.log(`Sending contract ${contractAddress} to Python Analyzer...`);
     try {
       const response = await firstValueFrom(
         this.httpService.post(`${this.analyzerUrl}/analyze`, {
           contract_address: contractAddress,
           source_code: sourceCode || null,
-          bytecode: '0x1234',
+          bytecode: bytecode || null,
         }),
       );
       return response.data;
