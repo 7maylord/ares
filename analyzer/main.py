@@ -7,6 +7,7 @@ import logging
 from analyzer.analyzers.slither_runner import SlitherRunner
 from analyzer.analyzers.llm_rag_runner import LLMRagRunner
 from analyzer.analyzers.decompiler import decompile
+from analyzer.feedback import router as feedback_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -40,6 +41,8 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize LLM RAG runner: {e}")
     llm_rag_runner = None
+
+app.include_router(feedback_router)
 
 @app.get("/")
 def read_root():
