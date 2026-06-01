@@ -6,6 +6,7 @@ import logging
 
 from analyzer.analyzers.slither_runner import SlitherRunner
 from analyzer.analyzers.llm_rag_runner import LLMRagRunner
+from analyzer.analyzers.decompiler import decompile
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class AnalyzeResponse(BaseModel):
     status: str
     vulnerabilities_found: int
     details: List[Dict[str, Any]]
+    source_type: str  # "verified_source" | "decompiled" | "bytecode_only"
 
 # Instantiate runners
 slither_runner = SlitherRunner()
@@ -50,33 +52,43 @@ def read_root():
 def analyze_contract(request: AnalyzeRequest):
     if not request.source_code and not request.bytecode:
         raise HTTPException(status_code=400, detail="Must provide either source_code or bytecode")
-    
-    source = request.source_code or ""
+
     all_findings = []
+    source_type: str
 
-    # 1. Run Slither if source code is provided
-    if source:
-        logger.info(f"Running Slither analysis on contract {request.contract_address}...")
-        try:
-            slither_results = slither_runner.run_analysis_on_source(source)
-            if isinstance(slither_results, dict) and "results" in slither_results:
-                detectors = slither_results["results"].get("detectors", [])
-                for det in detectors:
-                    all_findings.append({
-                        "source": "slither",
-                        "title": det.get("check", "Slither Finding"),
-                        "severity": det.get("impact", "Medium"),
-                        "category": det.get("check", "Static Analysis"),
-                        "location": det.get("first_markdown_element", "unknown"),
-                        "description": det.get("description", ""),
-                        "poc_sketch": "N/A",
-                        "remediation": det.get("recommendation", "Review code logic")
-                    })
-        except Exception as e:
-            logger.error(f"Slither analysis failed: {e}")
+    if request.source_code:
+        # Verified Solidity source — analyze directly
+        source = request.source_code
+        source_type = "verified_source"
+    else:
+        # No source — decompile bytecode first
+        logger.info(f"No source for {request.contract_address}, decompiling bytecode...")
+        source = decompile(request.bytecode)
+        source_type = "decompiled"
+        logger.info(f"Decompiled {len(request.bytecode)} byte bytecode → {len(source)} chars")
 
-    # 2. Run LLM RAG if source code is provided and enabled
-    if source and llm_rag_runner:
+    # 1. Run Slither on whatever source we have
+    logger.info(f"Running Slither analysis on contract {request.contract_address} ({source_type})...")
+    try:
+        slither_results = slither_runner.run_analysis_on_source(source)
+        if isinstance(slither_results, dict) and "results" in slither_results:
+            detectors = slither_results["results"].get("detectors", [])
+            for det in detectors:
+                all_findings.append({
+                    "source": "slither",
+                    "title": det.get("check", "Slither Finding"),
+                    "severity": det.get("impact", "Medium"),
+                    "category": det.get("check", "Static Analysis"),
+                    "location": det.get("first_markdown_element", "unknown"),
+                    "description": det.get("description", ""),
+                    "poc_sketch": "N/A",
+                    "remediation": det.get("recommendation", "Review code logic")
+                })
+    except Exception as e:
+        logger.error(f"Slither analysis failed: {e}")
+
+    # 2. Run LLM RAG if enabled
+    if llm_rag_runner:
         logger.info(f"Running LLM RAG analysis on contract {request.contract_address}...")
         try:
             llm_findings = llm_rag_runner.analyze(source)
@@ -88,12 +100,9 @@ def analyze_contract(request: AnalyzeRequest):
         except Exception as e:
             logger.error(f"LLM RAG analysis failed: {e}")
 
-    # If no source code but bytecode is provided, we can log it (future work)
-    if not source and request.bytecode:
-        logger.info(f"Bytecode analysis requested for contract {request.contract_address} (Not implemented in MVP)")
-
     return AnalyzeResponse(
         status="success",
         vulnerabilities_found=len(all_findings),
-        details=all_findings
+        details=all_findings,
+        source_type=source_type,
     )
