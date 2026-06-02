@@ -1,18 +1,18 @@
-fastapi==0.111.0
-web3==6.20.0
-uvicorn==0.29.0
-pydantic==2.7.1
+fastapi>=0.115.0
+web3>=7.0.0
+uvicorn>=0.32.0
+pydantic>=2.11.0
 slither-analyzer==0.9.3
 solc-select==1.0.4
 
 # RAG / LLM dependencies
-anthropic==0.25.7
-chromadb==0.5.0
-beautifulsoup4==4.12.3
-httpx==0.27.0
-python-dotenv==1.0.1
+anthropic>=0.100.0
+chromadb>=1.0.0
+beautifulsoup4>=4.12.0
+httpx>=0.27.0
+python-dotenv>=1.0.0
 
 # Audit knowledge base ingestion
-pdfplumber==0.11.0
-PyPDF2==3.0.1
-GitPython==3.1.43
+pdfplumber>=0.11.0
+PyPDF2>=3.0.0
+GitPython>=3.1.0

@@ -10,7 +10,6 @@ Strategy:
 import subprocess
 import shutil
 import logging
-import re
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +70,7 @@ def decompile(bytecode: str) -> str:
     return _basic_disassemble(hex_code)
 
 
-def _run_heimdall(hex_code: str) -> str | None:
+def _run_heimdall(hex_code: str) -> "str | None":
     try:
         proc = subprocess.run(
             ["heimdall", "decompile", hex_code],
@@ -112,7 +111,7 @@ def _basic_disassemble(hex_code: str) -> str:
         if 0x60 <= op <= 0x7f:
             n = op - 0x5f
             push_data = raw[i + 1: i + 1 + n].hex()
-            lines.append(f"// {i:#06x}: {name} 0x{push_data}")
+            lines.append(f"// {i:#06x}: PUSH{n} 0x{push_data}")
             i += 1 + n
         elif 0x80 <= op <= 0x8f:
             lines.append(f"// {i:#06x}: DUP{op - 0x7f}")
