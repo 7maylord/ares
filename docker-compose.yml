@@ -1,0 +1,78 @@
+services:
+
+  # ── Redis (BullMQ job queue) ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── Python Analyzer microservice ────────────────────────────────────────────
+  analyzer:
+    build:
+      context: ./analyzer
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    volumes:
+      # Persist ChromaDB and training data across container restarts/upgrades
+      - chroma_data:/app/analyzer/rag/chroma_db
+      - training_data:/app/analyzer/rag/training_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  # ── NestJS Orchestrator ─────────────────────────────────────────────────────
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DATABASE_URL: ${DATABASE_URL}
+      MANTLE_SEPOLIA_RPC_URL: ${MANTLE_SEPOLIA_RPC_URL}
+      MANTLESCAN_API_KEY: ${MANTLESCAN_API_KEY}
+      POOL_ADDRESS: ${POOL_ADDRESS}
+      ESCROW_ADDRESS: ${ESCROW_ADDRESS}
+      AGENT_PRIVATE_KEY: ${AGENT_PRIVATE_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      # These point to sibling containers — NOT localhost
+      ANALYZER_SERVICE_URL: http://analyzer:8000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      analyzer:
+        condition: service_healthy
+
+  # ── Next.js Dashboard ───────────────────────────────────────────────────────
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://server:3001
+    depends_on:
+      - server
+
+volumes:
+  chroma_data:
+  training_data:

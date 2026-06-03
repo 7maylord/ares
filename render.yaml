@@ -1,0 +1,63 @@
+services:
+
+  # ── Python Analyzer ─────────────────────────────────────────────────────────
+  # Private service — only reachable by other Render services, not the public internet
+  - type: web
+    name: ares-analyzer
+    runtime: docker
+    dockerfilePath: ./analyzer/Dockerfile
+    dockerContext: ./analyzer
+    plan: starter          # upgrade to standard if Heimdall build times out
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false        # you'll paste this in the Render dashboard
+    disk:
+      name: chroma-data
+      mountPath: /app/analyzer/rag/chroma_db
+      sizeGB: 5
+
+  # ── NestJS Orchestrator ──────────────────────────────────────────────────────
+  - type: web
+    name: ares-server
+    runtime: docker
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    plan: starter
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        sync: false
+      - key: MANTLE_SEPOLIA_RPC_URL
+        value: https://rpc.sepolia.mantle.xyz
+      - key: MANTLESCAN_API_KEY
+        sync: false
+      - key: POOL_ADDRESS
+        value: 0x9Bc25B223787Ce045e8B5C19A2547B3b1eBDA1D8
+      - key: ESCROW_ADDRESS
+        value: 0x084D072416984F89d9dfF6548A357C88aE7A39Fe
+      - key: AGENT_PRIVATE_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANALYZER_SERVICE_URL
+        fromService:
+          name: ares-analyzer
+          type: web
+          property: host               # Render injects the internal URL automatically
+      - key: REDIS_HOST
+        fromService:
+          name: ares-redis
+          type: redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: ares-redis
+          type: redis
+          property: port
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  - type: redis
+    name: ares-redis
+    plan: starter
+    ipAllowList: []        # only allow internal Render network access
