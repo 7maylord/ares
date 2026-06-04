@@ -8,6 +8,7 @@ from analyzer.analyzers.slither_runner import SlitherRunner
 from analyzer.analyzers.llm_rag_runner import LLMRagRunner
 from analyzer.analyzers.decompiler import decompile
 from analyzer.feedback import router as feedback_router
+from analyzer.poc_validator import PoCValidator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class AnalyzeResponse(BaseModel):
 
 # Instantiate runners
 slither_runner = SlitherRunner()
+poc_validator = PoCValidator()
 # Lazy load LLM RAG runner only if API key is present, to prevent crash on startup if missing
 try:
     if os.getenv("ANTHROPIC_API_KEY"):
@@ -102,6 +104,14 @@ def analyze_contract(request: AnalyzeRequest):
                         all_findings.append(finding)
         except Exception as e:
             logger.error(f"LLM RAG analysis failed: {e}")
+
+    # Generate ABI-encoded PoC payload for each finding (falls back to "0x" if no template)
+    contract_info = {"address": request.contract_address}
+    for finding in all_findings:
+        if not finding.get("poc_sketch") or finding["poc_sketch"] == "N/A":
+            finding["poc_sketch"] = poc_validator.generate_poc(
+                finding.get("category", ""), contract_info
+            )
 
     return AnalyzeResponse(
         status="success",

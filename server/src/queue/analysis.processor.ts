@@ -1,24 +1,25 @@
-import { Processor, Process } from '@nestjs/bull';
+import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
-import { ANALYSIS_QUEUE, } from './queue.module';
+import { Job } from 'bullmq';
+import { ANALYSIS_QUEUE } from './queue.module';
 import { AnalysisJob } from './queue.service';
 import { ContractFetcherService } from '../blockchain/contract-fetcher.service';
 import { AnalyzerService } from '../analyzer/analyzer.service';
 import { SubmitterService } from '../submitter/submitter.service';
 
 @Processor(ANALYSIS_QUEUE)
-export class AnalysisProcessor {
+export class AnalysisProcessor extends WorkerHost {
   private readonly logger = new Logger(AnalysisProcessor.name);
 
   constructor(
     private readonly contractFetcherService: ContractFetcherService,
     private readonly analyzerService: AnalyzerService,
     private readonly submitterService: SubmitterService,
-  ) {}
+  ) {
+    super();
+  }
 
-  @Process()
-  async handle(job: Job<AnalysisJob>): Promise<void> {
+  async process(job: Job<AnalysisJob>): Promise<void> {
     const { bountyId, targetContract, poolAddress } = job.data;
     this.logger.log(`Processing analysis job for bounty ${bountyId} → ${targetContract}`);
 
@@ -47,7 +48,7 @@ export class AnalysisProcessor {
       await this.submitterService.submitFinding(
         poolAddress,
         bountyId,
-        topFinding?.poc_data || '0xdeadbeef',
+        topFinding?.poc_sketch || '0x',
         topFinding?.description || 'Vulnerability detected',
       );
     } else {

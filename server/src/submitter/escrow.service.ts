@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createWalletClient, http, publicActions } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { mantleTestnet } from 'viem/chains';
+import { mantleSepoliaTestnet } from 'viem/chains';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -22,7 +22,7 @@ export class EscrowService {
 
     this.client = createWalletClient({
       account,
-      chain: mantleTestnet,
+      chain: mantleSepoliaTestnet,
       transport: http(),
     }).extend(publicActions);
 

@@ -1,11 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createPublicClient, http } from 'viem';
-import { mantleTestnet } from 'viem/chains';
-import { AnalyzerService } from '../analyzer/analyzer.service';
-import { SubmitterService } from '../submitter/submitter.service';
+import { mantleSepoliaTestnet } from 'viem/chains';
 import { EscrowService } from '../submitter/escrow.service';
-import { ContractFetcherService } from './contract-fetcher.service';
 import { QueueService } from '../queue/queue.service';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -19,10 +16,7 @@ export class BlockchainService implements OnModuleInit {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly analyzerService: AnalyzerService,
-    private readonly submitterService: SubmitterService,
     private readonly escrowService: EscrowService,
-    private readonly contractFetcherService: ContractFetcherService,
     private readonly queueService: QueueService,
   ) {
     const poolAddress = this.configService.get<string>('POOL_ADDRESS');
@@ -32,7 +26,7 @@ export class BlockchainService implements OnModuleInit {
     this.POOL_ADDRESS = poolAddress;
 
     this.client = createPublicClient({
-      chain: mantleTestnet,
+      chain: mantleSepoliaTestnet,
       transport: http()
     });
 

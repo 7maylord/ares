@@ -41,10 +41,7 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ANALYZER_SERVICE_URL
-        fromService:
-          name: ares-analyzer
-          type: web
-          property: host               # Render injects the internal URL automatically
+        value: http://ares-analyzer:10000   # Render internal service URL (default port 10000)
       - key: REDIS_HOST
         fromService:
           name: ares-redis
