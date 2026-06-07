@@ -3,15 +3,17 @@ import { HttpModule } from '@nestjs/axios';
 import { BlockchainService } from './blockchain.service';
 import { ContractFetcherService } from './contract-fetcher.service';
 import { FeedbackService } from './feedback.service';
-import { QueueService } from '../queue/queue.service';
 import { AnalysisProcessor } from '../queue/analysis.processor';
-import { QueueModule } from '../queue/queue.module';
 import { AnalyzerModule } from '../analyzer/analyzer.module';
 import { SubmitterModule } from '../submitter/submitter.module';
 
+// FUTURE: re-enable QueueModule + QueueService when adding Redis
+// import { QueueModule } from '../queue/queue.module';
+// import { QueueService } from '../queue/queue.service';
+
 @Module({
-  imports: [HttpModule, QueueModule, AnalyzerModule, SubmitterModule],
-  providers: [BlockchainService, ContractFetcherService, FeedbackService, QueueService, AnalysisProcessor],
+  imports: [HttpModule, AnalyzerModule, SubmitterModule],
+  providers: [BlockchainService, ContractFetcherService, FeedbackService, AnalysisProcessor],
   exports: [ContractFetcherService],
 })
 export class BlockchainModule {}

@@ -7,10 +7,10 @@ services:
     runtime: docker
     dockerfilePath: ./analyzer/Dockerfile
     dockerContext: ./analyzer
-    plan: starter          # upgrade to standard if Heimdall build times out
+    plan: starter
     envVars:
       - key: ANTHROPIC_API_KEY
-        sync: false        # you'll paste this in the Render dashboard
+        sync: false        # paste in the Render dashboard
     disk:
       name: chroma-data
       mountPath: /app/analyzer/rag/chroma_db
@@ -42,19 +42,23 @@ services:
         sync: false
       - key: ANALYZER_SERVICE_URL
         value: http://ares-analyzer:10000   # Render internal service URL (default port 10000)
-      - key: REDIS_HOST
-        fromService:
-          name: ares-redis
-          type: redis
-          property: host
-      - key: REDIS_PORT
-        fromService:
-          name: ares-redis
-          type: redis
-          property: port
+      # FUTURE: restore when Redis is re-enabled
+      # - key: REDIS_HOST
+      #   fromService:
+      #     name: ares-redis
+      #     type: redis
+      #     property: host
+      # - key: REDIS_PORT
+      #   fromService:
+      #     name: ares-redis
+      #     type: redis
+      #     property: port
 
-  # ── Redis ────────────────────────────────────────────────────────────────────
-  - type: redis
-    name: ares-redis
-    plan: starter
-    ipAllowList: []        # only allow internal Render network access
+  # ── FUTURE: Redis ────────────────────────────────────────────────────────────
+  # Re-enable when adding BullMQ for job durability and retries.
+  # Also restore REDIS_HOST / REDIS_PORT in ares-server envVars above.
+  #
+  # - type: redis
+  #   name: ares-redis
+  #   plan: starter
+  #   ipAllowList: []        # only allow internal Render network access

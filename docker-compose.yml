@@ -1,16 +1,19 @@
 services:
 
-  # ── Redis (BullMQ job queue) ────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+  # ── FUTURE: Redis (BullMQ job queue) ────────────────────────────────────────
+  # Re-enable when adding job durability and retries. Also restore REDIS_HOST /
+  # REDIS_PORT in the server environment below and uncomment the redis dependency.
+  #
+  # redis:
+  #   image: redis:7-alpine
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 5
 
   # ── Python Analyzer microservice ────────────────────────────────────────────
   analyzer:
@@ -50,15 +53,16 @@ services:
       ESCROW_ADDRESS: ${ESCROW_ADDRESS}
       AGENT_PRIVATE_KEY: ${AGENT_PRIVATE_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      # These point to sibling containers — NOT localhost
       ANALYZER_SERVICE_URL: http://analyzer:8000
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      # FUTURE: restore when Redis is re-enabled
+      # REDIS_HOST: redis
+      # REDIS_PORT: 6379
     depends_on:
-      redis:
-        condition: service_healthy
       analyzer:
         condition: service_healthy
+      # FUTURE: restore when Redis is re-enabled
+      # redis:
+      #   condition: service_healthy
 
   # ── Next.js Dashboard ───────────────────────────────────────────────────────
   client:

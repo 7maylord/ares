@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { createPublicClient, http } from 'viem';
 import { mantleSepoliaTestnet } from 'viem/chains';
 import { EscrowService } from '../submitter/escrow.service';
-import { QueueService } from '../queue/queue.service';
+import { AnalysisProcessor } from '../queue/analysis.processor';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -17,7 +17,7 @@ export class BlockchainService implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
     private readonly escrowService: EscrowService,
-    private readonly queueService: QueueService,
+    private readonly analysisProcessor: AnalysisProcessor,
   ) {
     const poolAddress = this.configService.get<string>('POOL_ADDRESS');
     if (!poolAddress) {
@@ -70,14 +70,17 @@ export class BlockchainService implements OnModuleInit {
     });
   }
 
-  private async handleBountyCreated(args: { bountyId: bigint, targetContract: string }) {
+  private handleBountyCreated(args: { bountyId: bigint, targetContract: string }) {
     this.logger.log(`New bounty detected! ID: ${args.bountyId}, Target: ${args.targetContract}`);
-    // Push to queue — analysis runs asynchronously so this handler never blocks
-    await this.queueService.enqueueAnalysis({
+
+    // Fire-and-forget: runs async without blocking the event listener.
+    // FUTURE: replace with queueService.enqueueAnalysis() once Redis is available
+    // for job durability and retries (see queue/queue.service.ts).
+    this.analysisProcessor.run({
       bountyId: Number(args.bountyId),
       targetContract: args.targetContract,
       poolAddress: this.POOL_ADDRESS,
-    });
+    }).catch(err => this.logger.error(`Analysis failed for bounty ${args.bountyId}`, err));
   }
 
   private async handleFindingSubmitted(args: { findingId: bigint, bountyId: bigint, agent: string, severity: number }) {

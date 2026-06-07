@@ -1,11 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { BlockchainService } from './blockchain.service';
-import { AnalyzerService } from '../analyzer/analyzer.service';
-import { SubmitterService } from '../submitter/submitter.service';
 import { EscrowService } from '../submitter/escrow.service';
-import { ContractFetcherService } from './contract-fetcher.service';
-import { QueueService } from '../queue/queue.service';
+import { AnalysisProcessor } from '../queue/analysis.processor';
 
 const mockConfigService = {
   get: (key: string) => {
@@ -19,33 +16,27 @@ const mockConfigService = {
 
 describe('BlockchainService', () => {
   let service: BlockchainService;
-  let queueService: jest.Mocked<QueueService>;
+  let analysisProcessor: jest.Mocked<AnalysisProcessor>;
   let escrowService: jest.Mocked<EscrowService>;
 
   beforeEach(async () => {
-    const mockQueueService = { enqueueAnalysis: jest.fn().mockResolvedValue(undefined) };
-    const mockAnalyzerService = { analyzeContract: jest.fn() };
-    const mockSubmitterService = { submitFinding: jest.fn() };
+    const mockAnalysisProcessor = { run: jest.fn().mockResolvedValue(undefined) };
     const mockEscrowService = {
       verifyFinding: jest.fn().mockResolvedValue('0xtxhash'),
       rejectFinding: jest.fn().mockResolvedValue('0xtxhash'),
     };
-    const mockContractFetcherService = { fetchContract: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BlockchainService,
         { provide: ConfigService, useValue: mockConfigService },
-        { provide: AnalyzerService, useValue: mockAnalyzerService },
-        { provide: SubmitterService, useValue: mockSubmitterService },
         { provide: EscrowService, useValue: mockEscrowService },
-        { provide: ContractFetcherService, useValue: mockContractFetcherService },
-        { provide: QueueService, useValue: mockQueueService },
+        { provide: AnalysisProcessor, useValue: mockAnalysisProcessor },
       ],
     }).compile();
 
     service = module.get<BlockchainService>(BlockchainService);
-    queueService = module.get(QueueService);
+    analysisProcessor = module.get(AnalysisProcessor);
     escrowService = module.get(EscrowService);
   });
 
@@ -54,13 +45,16 @@ describe('BlockchainService', () => {
   });
 
   describe('handleBountyCreated', () => {
-    it('enqueues an analysis job with bountyId, targetContract, and poolAddress', async () => {
-      await (service as any).handleBountyCreated({
+    it('runs analysis fire-and-forget with bountyId, targetContract, and poolAddress', async () => {
+      (service as any).handleBountyCreated({
         bountyId: BigInt(42),
         targetContract: '0xtarget',
       });
 
-      expect(queueService.enqueueAnalysis).toHaveBeenCalledWith({
+      // allow the microtask to flush
+      await Promise.resolve();
+
+      expect(analysisProcessor.run).toHaveBeenCalledWith({
         bountyId: 42,
         targetContract: '0xtarget',
         poolAddress: '0xpool',
