@@ -6,13 +6,16 @@ import { FeedbackService } from './feedback.service';
 import { AnalysisProcessor } from '../queue/analysis.processor';
 import { AnalyzerModule } from '../analyzer/analyzer.module';
 import { SubmitterModule } from '../submitter/submitter.module';
+import { BountiesModule } from '../bounties/bounties.module';
+import { FindingsModule } from '../findings/findings.module';
+import { EventsModule } from '../events/events.module';
 
 // FUTURE: re-enable QueueModule + QueueService when adding Redis
 // import { QueueModule } from '../queue/queue.module';
 // import { QueueService } from '../queue/queue.service';
 
 @Module({
-  imports: [HttpModule, AnalyzerModule, SubmitterModule],
+  imports: [HttpModule, AnalyzerModule, SubmitterModule, BountiesModule, FindingsModule, EventsModule],
   providers: [BlockchainService, ContractFetcherService, FeedbackService, AnalysisProcessor],
   exports: [ContractFetcherService],
 })
