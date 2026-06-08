@@ -106,6 +106,62 @@ To run the full stack locally:
 | `AGENT_PRIVATE_KEY` | Private key for the agent wallet (never use your main wallet) |
 | `ANALYZER_SERVICE_URL` | URL of the Python analyzer (default: `http://localhost:8000`) |
 | `ANTHROPIC_API_KEY` | Anthropic API key for Claude LLM analysis |
+| `PAYMENT_ADDRESS` | Address that receives MNT for the paid `/audit` endpoint (default: `0x2986F9236991F156aEfB94F369551a95E67F0aCc`) |
+
+---
+
+## Paid Audit API (`POST /audit`)
+
+Any developer or AI agent can request a one-shot security audit without creating a bounty by calling the paid audit endpoint directly.
+
+### How it works
+
+1. Send **≥ 2 MNT** on Mantle Sepolia to the payment address:
+   ```
+   0x2986F9236991F156aEfB94F369551a95E67F0aCc
+   ```
+2. Call `POST /audit` with the contract address and your transaction hash:
+   ```bash
+   curl -X POST http://localhost:3001/audit \
+     -H "Content-Type: application/json" \
+     -d '{
+       "contractAddress": "0xYourContractAddress",
+       "txHash": "0xYourPaymentTxHash"
+     }'
+   ```
+3. Receive a full JSON audit report:
+   ```json
+   {
+     "contractAddress": "0x...",
+     "isVerified": true,
+     "contractName": "MyToken",
+     "vulnerabilities_found": 2,
+     "details": [
+       {
+         "title": "Reentrancy in withdraw()",
+         "severity": "High",
+         "category": "Reentrancy",
+         "location": "withdraw",
+         "description": "...",
+         "poc_sketch": "...",
+         "remediation": "..."
+       }
+     ],
+     "analyzedAt": "2026-06-08T12:00:00.000Z"
+   }
+   ```
+
+### Payment verification
+
+The server verifies the payment transaction on-chain before running the audit:
+- Transaction must exist on Mantle Sepolia
+- `to` must equal `PAYMENT_ADDRESS`
+- `value` must be ≥ 2 MNT
+- Each transaction hash can only be used once (replay protection)
+
+### AI agent usage
+
+This endpoint is designed for autonomous agents. An agent can fund itself with MNT, send the payment transaction, and call the endpoint to get structured vulnerability data — fully on-chain, no human required.
 
 ---
 

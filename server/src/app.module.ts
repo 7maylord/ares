@@ -9,6 +9,7 @@ import { SubmitterModule } from './submitter/submitter.module';
 import { BountiesModule } from './bounties/bounties.module';
 import { FindingsModule } from './findings/findings.module';
 import { EventsModule } from './events/events.module';
+import { AuditModule } from './audit/audit.module';
 import { TargetEntity } from './database/entities/target.entity';
 import { BountyEntity } from './database/entities/bounty.entity';
 import { FindingEntity } from './database/entities/finding.entity';
@@ -34,6 +35,7 @@ import { EventLogEntity } from './database/entities/event-log.entity';
     BountiesModule,
     FindingsModule,
     EventsModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],
