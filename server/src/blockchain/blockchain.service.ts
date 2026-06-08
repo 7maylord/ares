@@ -18,6 +18,8 @@ export class BlockchainService implements OnModuleInit {
   private client: ReturnType<typeof createPublicClient>;
   private poolAbi: any;
   private readonly POOL_ADDRESS: string;
+  private reputationAbi: any;
+  private readonly REPUTATION_ADDRESS: string;
 
   constructor(
     private readonly configService: ConfigService,
@@ -28,8 +30,13 @@ export class BlockchainService implements OnModuleInit {
     private readonly eventsService: EventsService,
   ) {
     const poolAddress = this.configService.get<string>('POOL_ADDRESS');
-    if (!poolAddress) throw new Error('POOL_ADDRESS environment variable is not defined');
+    if (!poolAddress)
+      throw new Error('POOL_ADDRESS environment variable is not defined');
     this.POOL_ADDRESS = poolAddress;
+
+    this.REPUTATION_ADDRESS =
+      this.configService.get<string>('REPUTATION_ADDRESS') ??
+      '0x2986F9236991F156aEfB94F369551a95E67F0aCc';
 
     this.client = createPublicClient({
       chain: mantleSepoliaTestnet,
@@ -40,14 +47,28 @@ export class BlockchainService implements OnModuleInit {
     if (fs.existsSync(abiPath)) {
       this.poolAbi = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
     }
+
+    const repAbiPath = path.join(
+      __dirname,
+      '..',
+      'abi',
+      'ReputationLedger.abi.json',
+    );
+    if (fs.existsSync(repAbiPath)) {
+      this.reputationAbi = JSON.parse(fs.readFileSync(repAbiPath, 'utf8'));
+    }
   }
 
-  onModuleInit() {
+  async onModuleInit() {
     this.logger.log('Starting blockchain event listeners...');
     if (!this.poolAbi) {
       this.logger.warn('Pool ABI not found, skipping event listener setup');
       return;
     }
+
+    await this.checkAgentReputation();
+    await this.backfillPastEvents();
+    await this.backfillPendingFindings();
 
     this.client.watchContractEvent({
       address: this.POOL_ADDRESS as `0x${string}`,
@@ -56,8 +77,8 @@ export class BlockchainService implements OnModuleInit {
       onLogs: (logs) => {
         for (const log of logs) {
           const l = log as any;
-          this.handleBountyCreated(l.args, l.transactionHash).catch(err =>
-            this.logger.error('handleBountyCreated failed', err)
+          this.handleBountyCreated(l.args, l.transactionHash).catch((err) =>
+            this.logger.error('handleBountyCreated failed', err),
           );
         }
       },
@@ -70,8 +91,8 @@ export class BlockchainService implements OnModuleInit {
       onLogs: (logs) => {
         for (const log of logs) {
           const l = log as any;
-          this.handleFindingSubmitted(l.args, l.transactionHash).catch(err =>
-            this.logger.error('handleFindingSubmitted failed', err)
+          this.handleFindingSubmitted(l.args, l.transactionHash).catch((err) =>
+            this.logger.error('handleFindingSubmitted failed', err),
           );
         }
       },
@@ -84,8 +105,8 @@ export class BlockchainService implements OnModuleInit {
       onLogs: (logs) => {
         for (const log of logs) {
           const l = log as any;
-          this.handleFindingVerified(l.args, l.transactionHash).catch(err =>
-            this.logger.error('handleFindingVerified failed', err)
+          this.handleFindingVerified(l.args, l.transactionHash).catch((err) =>
+            this.logger.error('handleFindingVerified failed', err),
           );
         }
       },
@@ -98,24 +119,184 @@ export class BlockchainService implements OnModuleInit {
       onLogs: (logs) => {
         for (const log of logs) {
           const l = log as any;
-          this.handleFindingRejected(l.args, l.transactionHash).catch(err =>
-            this.logger.error('handleFindingRejected failed', err)
+          this.handleFindingRejected(l.args, l.transactionHash).catch((err) =>
+            this.logger.error('handleFindingRejected failed', err),
           );
         }
       },
     });
   }
 
+  private async checkAgentReputation() {
+    if (!this.reputationAbi) return;
+    try {
+      const pk = this.configService.get<string>('AGENT_PRIVATE_KEY');
+      if (!pk) return;
+      const { privateKeyToAccount } = await import('viem/accounts');
+      const agentAddress = privateKeyToAccount(pk as `0x${string}`).address;
+
+      const score = (await this.client.readContract({
+        address: this.REPUTATION_ADDRESS as `0x${string}`,
+        abi: this.reputationAbi,
+        functionName: 'reputationScore',
+        args: [agentAddress],
+      })) as bigint;
+
+      if (score === 0n) {
+        this.logger.error(
+          `⚠ Agent ${agentAddress} has reputation score 0 (unregistered). ` +
+            `submitFinding will revert. Run: cast send ${this.REPUTATION_ADDRESS} "registerAgent(address)" ${agentAddress} --private-key <DEPLOYER_KEY> --rpc-url https://rpc.sepolia.mantle.xyz`,
+        );
+      } else {
+        this.logger.log(`Agent ${agentAddress} reputation score: ${score}`);
+      }
+    } catch (err) {
+      this.logger.warn('Could not check agent reputation', err);
+    }
+  }
+
+  private async backfillPastEvents() {
+    this.logger.log('Syncing bounties from on-chain contract state...');
+    try {
+      const nextId = (await this.client.readContract({
+        address: this.POOL_ADDRESS as `0x${string}`,
+        abi: this.poolAbi,
+        functionName: 'nextBountyId',
+      })) as bigint;
+
+      this.logger.log(
+        `Contract reports ${nextId} bounty(s) — checking database...`,
+      );
+
+      for (let id = 0n; id < nextId; id++) {
+        const existing = await this.bountiesService.findByBountyId(Number(id));
+        if (existing) continue;
+
+        const bounty = (await this.client.readContract({
+          address: this.POOL_ADDRESS as `0x${string}`,
+          abi: this.poolAbi,
+          functionName: 'getBounty',
+          args: [id],
+        })) as {
+          targetContract: string;
+          bountyCreator: string;
+          rewardAmount: bigint;
+          severityThreshold: number;
+          active: boolean;
+          deadline: bigint;
+        };
+
+        const rewardEth = formatEther(bounty.rewardAmount);
+        const severity =
+          SEVERITY_LABELS[Number(bounty.severityThreshold)] ?? 'Medium';
+        const deadline = new Date(Number(bounty.deadline) * 1000)
+          .toISOString()
+          .split('T')[0];
+
+        this.logger.log(
+          `Importing missing bounty #${id} → ${bounty.targetContract}`,
+        );
+        await this.bountiesService.create({
+          bountyId: Number(id),
+          targetContract: bounty.targetContract,
+          creator: bounty.bountyCreator,
+          rewardAmount: rewardEth,
+          severityThreshold: severity,
+          deadline,
+          active: bounty.active,
+          status: 'PENDING',
+        });
+
+        this.analysisProcessor
+          .run({
+            bountyId: Number(id),
+            targetContract: bounty.targetContract,
+            poolAddress: this.POOL_ADDRESS,
+          })
+          .catch((err) =>
+            this.logger.error(`Analysis failed for bounty ${id}`, err),
+          );
+      }
+    } catch (err) {
+      this.logger.error('Failed to sync on-chain bounties', err);
+    }
+  }
+
+  private async backfillPendingFindings() {
+    this.logger.log('Checking for unprocessed on-chain findings...');
+    try {
+      const nextId = (await this.client.readContract({
+        address: this.POOL_ADDRESS as `0x${string}`,
+        abi: this.poolAbi,
+        functionName: 'nextFindingId',
+      })) as bigint;
+
+      for (let id = 0n; id < nextId; id++) {
+        const finding = (await this.client.readContract({
+          address: this.POOL_ADDRESS as `0x${string}`,
+          abi: this.poolAbi,
+          functionName: 'getFinding',
+          args: [id],
+        })) as {
+          agent: string;
+          bountyId: bigint;
+          status: number;
+          severity: number;
+          description: string;
+        };
+
+        // FindingStatus.Pending = 0
+        if (finding.status !== 0) continue;
+
+        this.logger.log(
+          `Found unverified on-chain finding #${id} (bounty #${finding.bountyId}) — triggering auto-verify`,
+        );
+
+        // Update DB record if the findingId wasn't captured
+        const dbFinding = await this.findingsService.findByBountyId(
+          Number(finding.bountyId),
+        );
+        if (dbFinding && dbFinding.findingId == null) {
+          await this.findingsService.updateById(dbFinding.id, {
+            findingId: Number(id),
+            agent: finding.agent,
+          });
+        }
+
+        try {
+          const verifyHash = await this.escrowService.verifyFinding(Number(id));
+          this.logger.log(`Finding #${id} auto-verified in tx: ${verifyHash}`);
+        } catch (err) {
+          this.logger.error(`Auto-verify failed for finding #${id}`, err);
+        }
+      }
+    } catch (err) {
+      this.logger.error('Failed to backfill pending findings', err);
+    }
+  }
+
   private async handleBountyCreated(
-    args: { bountyId: bigint; creator: string; targetContract: string; rewardAmount: bigint; severityThreshold: number; deadline: bigint },
+    args: {
+      bountyId: bigint;
+      creator: string;
+      targetContract: string;
+      rewardAmount: bigint;
+      severityThreshold: number;
+      deadline: bigint;
+    },
     txHash?: string,
   ) {
     const bountyId = Number(args.bountyId);
     const rewardEth = formatEther(args.rewardAmount);
-    const severity = SEVERITY_LABELS[Number(args.severityThreshold)] ?? 'Medium';
-    const deadline = new Date(Number(args.deadline) * 1000).toISOString().split('T')[0];
+    const severity =
+      SEVERITY_LABELS[Number(args.severityThreshold)] ?? 'Medium';
+    const deadline = new Date(Number(args.deadline) * 1000)
+      .toISOString()
+      .split('T')[0];
 
-    this.logger.log(`BountyCreated #${bountyId} → ${args.targetContract} (${rewardEth} ETH)`);
+    this.logger.log(
+      `BountyCreated #${bountyId} → ${args.targetContract} (${rewardEth} ETH)`,
+    );
 
     await this.bountiesService.create({
       bountyId,
@@ -135,22 +316,33 @@ export class BlockchainService implements OnModuleInit {
     );
 
     // Fire-and-forget analysis
-    this.analysisProcessor.run({
-      bountyId,
-      targetContract: args.targetContract,
-      poolAddress: this.POOL_ADDRESS,
-    }).catch(err => this.logger.error(`Analysis failed for bounty ${bountyId}`, err));
+    this.analysisProcessor
+      .run({
+        bountyId,
+        targetContract: args.targetContract,
+        poolAddress: this.POOL_ADDRESS,
+      })
+      .catch((err) =>
+        this.logger.error(`Analysis failed for bounty ${bountyId}`, err),
+      );
   }
 
   private async handleFindingSubmitted(
-    args: { findingId: bigint; bountyId: bigint; agent: string; severity: number },
+    args: {
+      findingId: bigint;
+      bountyId: bigint;
+      agent: string;
+      severity: number;
+    },
     txHash?: string,
   ) {
     const findingId = Number(args.findingId);
     const bountyId = Number(args.bountyId);
     const severity = SEVERITY_LABELS[Number(args.severity)] ?? 'Medium';
 
-    this.logger.log(`FindingSubmitted #${findingId} for bounty #${bountyId} by ${args.agent}`);
+    this.logger.log(
+      `FindingSubmitted #${findingId} for bounty #${bountyId} by ${args.agent}`,
+    );
 
     // Update the finding record (created by AnalysisProcessor) with on-chain IDs
     const existing = await this.findingsService.findByBountyId(bountyId);
@@ -173,7 +365,9 @@ export class BlockchainService implements OnModuleInit {
     // Auto-verify as the MVP oracle
     try {
       const verifyHash = await this.escrowService.verifyFinding(findingId);
-      this.logger.log(`Finding #${findingId} auto-verified in tx: ${verifyHash}`);
+      this.logger.log(
+        `Finding #${findingId} auto-verified in tx: ${verifyHash}`,
+      );
     } catch (error) {
       this.logger.error(`Failed to auto-verify finding #${findingId}`, error);
     }
@@ -188,8 +382,12 @@ export class BlockchainService implements OnModuleInit {
 
     this.logger.log(`FindingVerified #${findingId} for bounty #${bountyId}`);
 
-    await this.findingsService.updateByBountyId(bountyId, { status: 'Verified' });
-    await this.bountiesService.updateByBountyId(bountyId, { status: 'VERIFIED' });
+    await this.findingsService.updateByBountyId(bountyId, {
+      status: 'Verified',
+    });
+    await this.bountiesService.updateByBountyId(bountyId, {
+      status: 'VERIFIED',
+    });
 
     await this.eventsService.log(
       'VerificationPassed',
@@ -207,7 +405,9 @@ export class BlockchainService implements OnModuleInit {
 
     this.logger.log(`FindingRejected #${findingId} for bounty #${bountyId}`);
 
-    await this.findingsService.updateByBountyId(bountyId, { status: 'Rejected' });
+    await this.findingsService.updateByBountyId(bountyId, {
+      status: 'Rejected',
+    });
 
     await this.eventsService.log(
       'VerificationFailed',

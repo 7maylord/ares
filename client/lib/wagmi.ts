@@ -1,20 +1,12 @@
 import { createConfig } from "@privy-io/wagmi";
 import { http } from "viem";
+import { mantleSepoliaTestnet } from "viem/chains";
 
-export const mantleSepolia = {
-  id: 5003,
-  name: "Mantle Sepolia",
-  nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
-  rpcUrls: { default: { http: ["https://rpc.sepolia.mantle.xyz"] } },
-  blockExplorers: {
-    default: { name: "Mantlescan", url: "https://sepolia.mantlescan.xyz" },
-  },
-  testnet: true,
-} as const;
+export { mantleSepoliaTestnet as mantleSepolia };
 
 export const wagmiConfig = createConfig({
-  chains: [mantleSepolia],
+  chains: [mantleSepoliaTestnet],
   transports: {
-    [mantleSepolia.id]: http("https://rpc.sepolia.mantle.xyz"),
+    [mantleSepoliaTestnet.id]: http("https://rpc.sepolia.mantle.xyz"),
   },
 });

@@ -15,6 +15,17 @@ export class BountiesService {
     return this.repo.save(this.repo.create(dto));
   }
 
+  async findByBountyId(bountyId: number): Promise<BountyEntity | null> {
+    return this.repo.findOne({ where: { bountyId } });
+  }
+
+  async findByTargetContract(targetContract: string): Promise<BountyEntity | null> {
+    return this.repo.findOne({
+      where: { targetContract },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async findAll(): Promise<BountyEntity[]> {
     return this.repo.find({ order: { createdAt: 'DESC' } });
   }

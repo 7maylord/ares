@@ -18,19 +18,29 @@ export class BlockchainController {
       throw new BadRequestException('targetContract must be a valid 0x address');
     }
 
-    const bountyId = Date.now() % 2_000_000_000;
     const poolAddress = this.configService.get<string>('POOL_ADDRESS') ?? '';
 
-    await this.bountiesService.create({
-      bountyId,
-      targetContract: dto.targetContract,
-      creator: 'manual-trigger',
-      rewardAmount: '0',
-      severityThreshold: 'Low',
-      deadline: new Date(Date.now() + 86_400_000).toISOString(),
-      active: false,
-      status: 'PENDING',
-    });
+    // Reuse an existing on-chain bounty for this target if one exists,
+    // so the finding is submitted against the real bountyId and reward.
+    const existing = await this.bountiesService.findByTargetContract(dto.targetContract);
+    let bountyId: number;
+
+    if (existing) {
+      bountyId = existing.bountyId;
+      await this.bountiesService.updateByBountyId(bountyId, { status: 'PENDING' });
+    } else {
+      bountyId = Date.now() % 2_000_000_000;
+      await this.bountiesService.create({
+        bountyId,
+        targetContract: dto.targetContract,
+        creator: 'manual-trigger',
+        rewardAmount: '0',
+        severityThreshold: 'Low',
+        deadline: new Date(Date.now() + 86_400_000).toISOString(),
+        active: false,
+        status: 'PENDING',
+      });
+    }
 
     this.analysisProcessor
       .run({ bountyId, targetContract: dto.targetContract, poolAddress })

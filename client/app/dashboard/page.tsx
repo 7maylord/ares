@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain } from "wagmi";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { parseEther } from "viem";
 
@@ -112,6 +112,11 @@ export default function Dashboard() {
   const { wallets } = useWallets();
   const address = wallets[0]?.address;
   const isConnected = authenticated && !!address;
+
+  const chainId = useChainId();
+  const { switchChain, isPending: isSwitching } = useSwitchChain();
+  const MANTLE_SEPOLIA_ID = 5003;
+  const isWrongNetwork = isConnected && chainId !== MANTLE_SEPOLIA_ID;
 
   // ── Create Bounty ─────────────────────────────────────────────────────────
   const [showCreate, setShowCreate] = useState(false);
@@ -227,6 +232,19 @@ export default function Dashboard() {
       {error && (
         <div className="bg-rose-950/40 border-b border-rose-800/40 text-rose-300 text-xs py-2 px-6 font-mono text-center">
           {error}
+        </div>
+      )}
+
+      {isWrongNetwork && (
+        <div className="bg-amber-950/40 border-b border-amber-700/40 text-amber-300 text-xs py-2 px-6 font-mono flex items-center justify-center gap-4">
+          <span>⚠ Wrong network — Ares runs on Mantle Sepolia (chain 5003)</span>
+          <button
+            onClick={() => switchChain({ chainId: MANTLE_SEPOLIA_ID })}
+            disabled={isSwitching}
+            className="px-3 py-1 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-200 hover:bg-amber-500/30 transition-all disabled:opacity-50"
+          >
+            {isSwitching ? "Switching..." : "Switch Network"}
+          </button>
         </div>
       )}
 
@@ -735,6 +753,14 @@ export default function Dashboard() {
                   className="w-full py-3 rounded-xl font-semibold text-sm bg-zinc-800 border border-zinc-700 text-zinc-200 hover:border-zinc-600 transition-all"
                 >
                   Connect Wallet
+                </button>
+              ) : isWrongNetwork ? (
+                <button
+                  onClick={() => switchChain({ chainId: MANTLE_SEPOLIA_ID })}
+                  disabled={isSwitching}
+                  className="w-full py-3 rounded-xl font-semibold text-sm bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50 transition-all"
+                >
+                  {isSwitching ? "Switching..." : "Switch to Mantle Sepolia"}
                 </button>
               ) : (
                 <div className="space-y-2">

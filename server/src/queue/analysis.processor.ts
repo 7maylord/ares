@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { toHex } from 'viem';
 import { AnalysisJob } from './queue.service';
 import { ContractFetcherService } from '../blockchain/contract-fetcher.service';
 import { AnalyzerService } from '../analyzer/analyzer.service';
@@ -96,11 +97,12 @@ export class AnalysisProcessor {
         `Ares Agent found ${result.vulnerabilities_found} vulnerability(s) in Bounty #${bountyId} — submitting on-chain`,
       );
 
-      // Submit on-chain
+      // Submit on-chain — encode poc_sketch as hex bytes so viem can ABI-encode it
+      const pocData = toHex(topFinding?.poc_sketch || '');
       const txHash = await this.submitterService.submitFinding(
         poolAddress,
         bountyId,
-        topFinding?.poc_sketch || '0x',
+        pocData,
         topFinding?.description || 'Vulnerability detected',
         topFinding?.severity || 'High',
       );

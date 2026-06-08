@@ -3,7 +3,8 @@
 import { PrivyProvider } from "@privy-io/react-auth";
 import { WagmiProvider } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { mantleSepolia, wagmiConfig } from "@/lib/wagmi";
+import { wagmiConfig } from "@/lib/wagmi";
+import { mantleSepoliaTestnet } from "viem/chains";
 
 const queryClient = new QueryClient();
 
@@ -13,8 +14,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
       config={{
         appearance: { theme: "dark" },
-        defaultChain: mantleSepolia,
-        supportedChains: [mantleSepolia],
+        defaultChain: mantleSepoliaTestnet,
+        supportedChains: [mantleSepoliaTestnet],
       }}
     >
       <QueryClientProvider client={queryClient}>
