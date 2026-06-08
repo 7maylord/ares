@@ -77,22 +77,25 @@ export default function Dashboard() {
   const [bounties, setBounties] = useState<Bounty[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [logs, setLogs] = useState<EventLog[]>([]);
+  const [agentStats, setAgentStats] = useState<{ address: string; reputationScore: number; successful: number; failed: number; total: number; balanceMnt: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "bounties" | "findings" | "leaderboard">("overview");
 
   const fetchAll = useCallback(async () => {
     try {
-      const [bRes, fRes, eRes] = await Promise.all([
+      const [bRes, fRes, eRes, aRes] = await Promise.all([
         fetch(`${API_URL}/bounties`),
         fetch(`${API_URL}/findings`),
         fetch(`${API_URL}/events`),
+        fetch(`${API_URL}/agent`),
       ]);
       if (!bRes.ok || !fRes.ok || !eRes.ok) throw new Error("API error");
       const [b, f, e] = await Promise.all([bRes.json(), fRes.json(), eRes.json()]);
       setBounties(b);
       setFindings(f);
       setLogs(e);
+      if (aRes.ok) setAgentStats(await aRes.json());
       setError(null);
     } catch {
       setError("Cannot reach the server. Make sure the NestJS server is running on port 3001.");
@@ -298,7 +301,7 @@ export default function Dashboard() {
           <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl flex flex-col gap-1">
             <span className="text-zinc-500 text-xs font-mono uppercase">Payouts Disbursed</span>
             <span className="text-2xl sm:text-3xl font-semibold text-emerald-400">{totalPayouts} MNT</span>
-            <span className="text-xs text-zinc-500">Released to agents</span>
+            <span className="text-xs text-zinc-500">{agentStats?.successful ?? 0} verified finding(s)</span>
           </div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl flex flex-col gap-1">
             <span className="text-zinc-500 text-xs font-mono uppercase">Monitored Targets</span>
@@ -313,9 +316,9 @@ export default function Dashboard() {
           <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl flex flex-col gap-1 col-span-2 lg:col-span-1">
             <span className="text-zinc-500 text-xs font-mono uppercase">Agent Reputation</span>
             <span className="text-2xl sm:text-3xl font-semibold text-purple-400">
-              {findings.filter((f) => f.status === "Verified").length * 50} REP
+              {agentStats?.reputationScore ?? "—"} REP
             </span>
-            <span className="text-xs text-purple-300/80">Ares Agent</span>
+            <span className="text-xs text-purple-300/80 font-mono truncate">{agentStats?.address ? `${agentStats.address.slice(0,10)}...` : "Ares Agent"}</span>
           </div>
         </section>
 
@@ -582,7 +585,7 @@ export default function Dashboard() {
                               rel="noreferrer"
                               className="text-cyan-400 font-mono text-xs truncate hover:underline"
                             >
-                              {f.txHash}
+                              {`${f.txHash.slice(0, 10)}...${f.txHash.slice(-8)}`}
                             </a>
                           </div>
                         )}
@@ -612,20 +615,18 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/60">
-                  <tr className="hover:bg-zinc-900/20 font-mono">
-                    <td className="py-4 px-4 font-semibold text-cyan-400">#1</td>
-                    <td className="py-4 px-4 text-zinc-200 text-xs">Ares Agent (autonomous)</td>
-                    <td className="py-4 px-4 font-bold text-purple-400">
-                      {findings.filter((f) => f.status === "Verified").length * 50} REP
-                    </td>
-                    <td className="py-4 px-4 text-xs">Tier 1 Elite</td>
-                    <td className="py-4 px-4 font-bold text-emerald-400">
-                      {findings.filter((f) => f.status === "Verified").length}
-                    </td>
-                    <td className="py-4 px-4 text-rose-500">
-                      {findings.filter((f) => f.status === "Rejected").length}
-                    </td>
-                  </tr>
+                  {agentStats ? (
+                    <tr className="hover:bg-zinc-900/20 font-mono">
+                      <td className="py-4 px-4 font-semibold text-cyan-400">#1</td>
+                      <td className="py-4 px-4 text-zinc-200 text-xs">{agentStats.address}</td>
+                      <td className="py-4 px-4 font-bold text-purple-400">{agentStats.reputationScore} REP</td>
+                      <td className="py-4 px-4 text-xs">{agentStats.reputationScore >= 800 ? "Elite" : agentStats.reputationScore >= 500 ? "Tier 1" : "Novice"}</td>
+                      <td className="py-4 px-4 font-bold text-emerald-400">{agentStats.successful}</td>
+                      <td className="py-4 px-4 text-rose-500">{agentStats.failed}</td>
+                    </tr>
+                  ) : (
+                    <tr><td colSpan={6} className="py-8 text-center text-zinc-600 text-sm">Loading agent stats...</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>

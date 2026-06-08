@@ -223,7 +223,7 @@ export class BlockchainService implements OnModuleInit {
   }
 
   private async backfillPendingFindings() {
-    this.logger.log('Checking for unprocessed on-chain findings...');
+    this.logger.log('Syncing on-chain finding statuses to database...');
     try {
       const nextId = (await this.client.readContract({
         address: this.POOL_ADDRESS as `0x${string}`,
@@ -237,41 +237,61 @@ export class BlockchainService implements OnModuleInit {
           abi: this.poolAbi,
           functionName: 'getFinding',
           args: [id],
-        })) as {
-          agent: string;
-          bountyId: bigint;
-          status: number;
-          severity: number;
-          description: string;
-        };
+        })) as { agent: string; bountyId: bigint; status: number; severity: number };
 
-        // FindingStatus.Pending = 0
-        if (finding.status !== 0) continue;
+        const bountyId = Number(finding.bountyId);
+        const findingId = Number(id);
+        const dbFinding = await this.findingsService.findByBountyId(bountyId);
 
-        this.logger.log(
-          `Found unverified on-chain finding #${id} (bounty #${finding.bountyId}) — triggering auto-verify`,
-        );
+        // FindingStatus: 0=Pending, 1=Verified, 2=Rejected
+        if (finding.status === 1) {
+          // Verified on-chain but DB not updated — sync it
+          this.logger.log(`Finding #${findingId} is Verified on-chain — syncing DB`);
+          if (dbFinding) {
+            await this.findingsService.updateById(dbFinding.id, {
+              findingId,
+              agent: finding.agent,
+              status: 'Verified',
+            });
+          }
+          await this.bountiesService.updateByBountyId(bountyId, { status: 'VERIFIED' });
+          await this.eventsService.log(
+            'VerificationPassed',
+            `Finding #${findingId} verified on-chain — DB synced for Bounty #${bountyId}`,
+          );
+          continue;
+        }
 
-        // Update DB record if the findingId wasn't captured
-        const dbFinding = await this.findingsService.findByBountyId(
-          Number(finding.bountyId),
-        );
+        if (finding.status === 2) {
+          // Rejected on-chain but DB not updated — sync it
+          this.logger.log(`Finding #${findingId} is Rejected on-chain — syncing DB`);
+          if (dbFinding) {
+            await this.findingsService.updateById(dbFinding.id, {
+              findingId,
+              agent: finding.agent,
+              status: 'Rejected',
+            });
+          }
+          continue;
+        }
+
+        // status === 0: Pending on-chain — trigger auto-verify
+        this.logger.log(`Finding #${findingId} is Pending on-chain — triggering auto-verify`);
         if (dbFinding && dbFinding.findingId == null) {
           await this.findingsService.updateById(dbFinding.id, {
-            findingId: Number(id),
+            findingId,
             agent: finding.agent,
           });
         }
-
         try {
-          const verifyHash = await this.escrowService.verifyFinding(Number(id));
-          this.logger.log(`Finding #${id} auto-verified in tx: ${verifyHash}`);
+          const verifyHash = await this.escrowService.verifyFinding(findingId);
+          this.logger.log(`Finding #${findingId} auto-verified in tx: ${verifyHash}`);
         } catch (err) {
-          this.logger.error(`Auto-verify failed for finding #${id}`, err);
+          this.logger.error(`Auto-verify failed for finding #${findingId}`, err);
         }
       }
     } catch (err) {
-      this.logger.error('Failed to backfill pending findings', err);
+      this.logger.error('Failed to sync on-chain findings', err);
     }
   }
 
