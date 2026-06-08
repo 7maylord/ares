@@ -32,8 +32,20 @@ export class SubmitterService {
     }
   }
 
-  async submitFinding(poolAddress: string, bountyId: number, pocData: string, description: string) {
-    this.logger.log(`Submitting finding for bounty ${bountyId} on pool ${poolAddress}`);
+  private severityToEnum(severity: string): number {
+    const map: Record<string, number> = { Low: 0, Medium: 1, High: 2, Critical: 3 };
+    return map[severity] ?? 2; // default High if unknown
+  }
+
+  async submitFinding(
+    poolAddress: string,
+    bountyId: number,
+    pocData: string,
+    description: string,
+    severity = 'High',
+  ) {
+    const severityEnum = this.severityToEnum(severity);
+    this.logger.log(`Submitting finding for bounty ${bountyId} on pool ${poolAddress} [severity=${severity}/${severityEnum}]`);
     try {
       const { request } = await this.client.simulateContract({
         address: poolAddress as `0x${string}`,
@@ -43,7 +55,7 @@ export class SubmitterService {
           BigInt(bountyId),
           pocData as `0x${string}`,
           description,
-          0 // Severity.High
+          severityEnum,
         ],
       });
       const hash = await this.client.writeContract(request);

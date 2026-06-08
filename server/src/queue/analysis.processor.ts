@@ -102,6 +102,7 @@ export class AnalysisProcessor {
         bountyId,
         topFinding?.poc_sketch || '0x',
         topFinding?.description || 'Vulnerability detected',
+        topFinding?.severity || 'High',
       );
 
       // Update finding record with txHash

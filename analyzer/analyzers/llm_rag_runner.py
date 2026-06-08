@@ -105,7 +105,7 @@ Return your analysis as a JSON array."""
         # Step 3: Call LLM
         try:
             response = self.anthropic_client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-sonnet-4-6",
                 system=SYSTEM_PROMPT,
                 messages=[
                     {"role": "user", "content": user_prompt},
