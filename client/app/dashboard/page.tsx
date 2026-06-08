@@ -2,8 +2,35 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { parseEther } from "viem";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const POOL_ADDRESS = (process.env.NEXT_PUBLIC_POOL_ADDRESS || "0x9Bc25B223787Ce045e8B5C19A2547B3b1eBDA1D8") as `0x${string}`;
+
+const BOUNTY_POOL_ABI = [
+  {
+    type: "function",
+    name: "createBounty",
+    inputs: [
+      { name: "targetContract", type: "address" },
+      { name: "rewardAmount", type: "uint256" },
+      { name: "severityThreshold", type: "uint8" },
+      { name: "deadline", type: "uint256" },
+      { name: "whitelistedAgents", type: "address[]" },
+    ],
+    outputs: [{ name: "bountyId", type: "uint256" }],
+    stateMutability: "payable",
+  },
+] as const;
+
+const SEVERITY_OPTIONS = [
+  { value: "0", label: "Low" },
+  { value: "1", label: "Medium" },
+  { value: "2", label: "High" },
+  { value: "3", label: "Critical" },
+];
 
 interface Bounty {
   id: number;
@@ -46,6 +73,7 @@ interface EventLog {
 }
 
 export default function Dashboard() {
+  // ── Data ──────────────────────────────────────────────────────────────────
   const [bounties, setBounties] = useState<Bounty[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [logs, setLogs] = useState<EventLog[]>([]);
@@ -79,6 +107,84 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [fetchAll]);
 
+  // ── Wallet ────────────────────────────────────────────────────────────────
+  const { login, authenticated } = usePrivy();
+  const { wallets } = useWallets();
+  const address = wallets[0]?.address;
+  const isConnected = authenticated && !!address;
+
+  // ── Create Bounty ─────────────────────────────────────────────────────────
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    targetContract: "",
+    rewardMnt: "1",
+    severity: "2",
+    deadlineDays: "30",
+  });
+  const {
+    writeContract,
+    data: createHash,
+    isPending: isCreating,
+    reset: resetCreate,
+    error: createError,
+  } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isCreateSuccess } =
+    useWaitForTransactionReceipt({ hash: createHash });
+
+  useEffect(() => {
+    if (isCreateSuccess) setTimeout(fetchAll, 4000);
+  }, [isCreateSuccess, fetchAll]);
+
+  function closeCreateModal() {
+    setShowCreate(false);
+    resetCreate();
+    setCreateForm({ targetContract: "", rewardMnt: "1", severity: "2", deadlineDays: "30" });
+  }
+
+  function submitCreateBounty() {
+    const rewardWei = parseEther(createForm.rewardMnt || "0");
+    const deadline = BigInt(
+      Math.floor(Date.now() / 1000) + Number(createForm.deadlineDays) * 86400
+    );
+    writeContract({
+      address: POOL_ADDRESS,
+      abi: BOUNTY_POOL_ABI,
+      functionName: "createBounty",
+      args: [
+        createForm.targetContract as `0x${string}`,
+        rewardWei,
+        Number(createForm.severity),
+        deadline,
+        [],
+      ],
+      value: rewardWei,
+    });
+  }
+
+  // ── Manual Analysis Trigger ───────────────────────────────────────────────
+  const [triggerContract, setTriggerContract] = useState("");
+  const [isTriggering, setIsTriggering] = useState(false);
+  const [triggerDone, setTriggerDone] = useState(false);
+
+  async function runManualAnalysis() {
+    if (!triggerContract.startsWith("0x")) return;
+    setIsTriggering(true);
+    setTriggerDone(false);
+    try {
+      await fetch(`${API_URL}/analysis/trigger`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetContract: triggerContract }),
+      });
+      setTriggerContract("");
+      setTriggerDone(true);
+      setTimeout(fetchAll, 2000);
+    } finally {
+      setIsTriggering(false);
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
   const totalBountyVolume = bounties
     .reduce((sum, b) => sum + parseFloat(b.rewardAmount || "0"), 0)
     .toFixed(2);
@@ -114,6 +220,7 @@ export default function Dashboard() {
     return `px-2 py-0.5 rounded text-[9px] font-mono font-bold border ${map[type] ?? map.AnalysisStarted}`;
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-50 font-sans flex flex-col selection:bg-cyan-500 selection:text-black">
 
@@ -151,6 +258,12 @@ export default function Dashboard() {
             >
               Refresh
             </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="text-xs px-4 py-2 rounded-lg font-semibold bg-linear-to-r from-cyan-500 to-purple-600 text-white hover:from-cyan-400 hover:to-purple-500 transition-all shadow-lg shadow-cyan-500/10"
+            >
+              + Create Bounty
+            </button>
           </div>
         </div>
       </header>
@@ -161,12 +274,12 @@ export default function Dashboard() {
         <section className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl flex flex-col gap-1">
             <span className="text-zinc-500 text-xs font-mono uppercase">Total Pool Locked</span>
-            <span className="text-2xl sm:text-3xl font-semibold text-cyan-400">{totalBountyVolume} ETH</span>
+            <span className="text-2xl sm:text-3xl font-semibold text-cyan-400">{totalBountyVolume} MNT</span>
             <span className="text-xs text-zinc-500">Across active escrows</span>
           </div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl flex flex-col gap-1">
             <span className="text-zinc-500 text-xs font-mono uppercase">Payouts Disbursed</span>
-            <span className="text-2xl sm:text-3xl font-semibold text-emerald-400">{totalPayouts} ETH</span>
+            <span className="text-2xl sm:text-3xl font-semibold text-emerald-400">{totalPayouts} MNT</span>
             <span className="text-xs text-zinc-500">Released to agents</span>
           </div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl flex flex-col gap-1">
@@ -210,7 +323,46 @@ export default function Dashboard() {
         {/* Overview */}
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 flex flex-col gap-6">
+
+              {/* Run Ares panel */}
+              <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-8 w-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-semibold text-zinc-100">Run Ares Agent</h2>
+                    <p className="text-xs text-zinc-500">Manually target any contract for immediate analysis — no bounty required</p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    placeholder="0x contract address..."
+                    value={triggerContract}
+                    onChange={(e) => { setTriggerContract(e.target.value); setTriggerDone(false); }}
+                    className="grow bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-purple-500/60 focus:ring-1 focus:ring-purple-500/20 transition-all"
+                  />
+                  <button
+                    onClick={runManualAnalysis}
+                    disabled={isTriggering || !triggerContract.startsWith("0x")}
+                    className="px-5 py-2.5 rounded-xl font-semibold text-sm bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                  >
+                    {isTriggering ? "Running..." : "▶ Run"}
+                  </button>
+                </div>
+                {triggerDone && (
+                  <p className="mt-2 text-xs text-emerald-400 font-mono">
+                    ✓ Analysis queued — results will appear below as they complete
+                  </p>
+                )}
+              </div>
+
+              {/* Escrow targets */}
               <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-base font-semibold text-zinc-100">Monitored Escrow Targets</h2>
@@ -220,7 +372,11 @@ export default function Dashboard() {
                   <div className="py-10 text-center text-zinc-600 text-sm">Loading...</div>
                 ) : bounties.length === 0 ? (
                   <div className="py-10 text-center text-zinc-600 text-sm">
-                    No bounties yet. Emit a <code className="font-mono">BountyCreated</code> event on the BountyPool contract to get started.
+                    No bounties yet.{" "}
+                    <button onClick={() => setShowCreate(true)} className="text-cyan-400 hover:underline">
+                      Create one
+                    </button>{" "}
+                    or run a manual analysis above.
                   </div>
                 ) : (
                   <div className="divide-y divide-zinc-800/60">
@@ -242,7 +398,7 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div className="shrink-0 text-right">
-                          <span className="text-sm font-bold text-cyan-300 font-mono">{bounty.rewardAmount} ETH</span>
+                          <span className="text-sm font-bold text-cyan-300 font-mono">{bounty.rewardAmount} MNT</span>
                           <span className="text-[10px] block text-zinc-500">Min: {bounty.severityThreshold}</span>
                         </div>
                       </div>
@@ -291,7 +447,15 @@ export default function Dashboard() {
         {/* Bounties tab */}
         {activeTab === "bounties" && (
           <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-zinc-100 mb-4">Bounty Escrows Register</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-zinc-100">Bounty Escrows Register</h2>
+              <button
+                onClick={() => setShowCreate(true)}
+                className="text-xs px-4 py-2 rounded-lg font-semibold bg-linear-to-r from-cyan-500 to-purple-600 text-white hover:from-cyan-400 hover:to-purple-500 transition-all"
+              >
+                + Create Bounty
+              </button>
+            </div>
             {bounties.length === 0 ? (
               <p className="text-zinc-500 text-sm text-center py-10">No bounties found.</p>
             ) : (
@@ -314,7 +478,7 @@ export default function Dashboard() {
                         <td className="py-4 px-4 text-zinc-400">#{b.bountyId}</td>
                         <td className="py-4 px-4 text-zinc-200 text-xs">{b.targetContract}</td>
                         <td className="py-4 px-4 text-xs text-zinc-500">{b.creator?.substring(0, 10)}...</td>
-                        <td className="py-4 px-4 font-bold text-cyan-300">{b.rewardAmount} ETH</td>
+                        <td className="py-4 px-4 font-bold text-cyan-300">{b.rewardAmount} MNT</td>
                         <td className="py-4 px-4 text-xs">{b.severityThreshold}</td>
                         <td className="py-4 px-4 text-xs text-zinc-400">{b.deadline}</td>
                         <td className="py-4 px-4"><span className={statusBadge(b.status)}>{b.status}</span></td>
@@ -394,7 +558,14 @@ export default function Dashboard() {
                         {f.txHash && (
                           <div>
                             <h4 className="text-xs font-mono uppercase text-zinc-500 mb-1">Tx Hash</h4>
-                            <p className="text-cyan-400 font-mono text-xs truncate">{f.txHash}</p>
+                            <a
+                              href={`https://sepolia.mantlescan.xyz/tx/${f.txHash}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-cyan-400 font-mono text-xs truncate hover:underline"
+                            >
+                              {f.txHash}
+                            </a>
                           </div>
                         )}
                       </div>
@@ -451,6 +622,139 @@ export default function Dashboard() {
           <Link href="/" className="hover:text-zinc-400 transition-colors">← Back to Home</Link>
         </div>
       </footer>
+
+      {/* ── Create Bounty Modal ─────────────────────────────────────────────── */}
+      {showCreate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) closeCreateModal(); }}
+        >
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl shadow-black/50">
+            <div className="flex items-center justify-between p-6 border-b border-zinc-800">
+              <div>
+                <h2 className="text-base font-bold text-zinc-100">Create Bounty</h2>
+                <p className="text-xs text-zinc-500 mt-0.5">Deploy an escrow on Mantle Sepolia — Ares will start auditing immediately</p>
+              </div>
+              <button
+                onClick={closeCreateModal}
+                className="text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Target contract */}
+              <div>
+                <label className="text-xs font-mono uppercase text-zinc-400 block mb-1.5">Target Contract</label>
+                <input
+                  type="text"
+                  placeholder="0x..."
+                  value={createForm.targetContract}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, targetContract: e.target.value }))}
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Reward */}
+                <div>
+                  <label className="text-xs font-mono uppercase text-zinc-400 block mb-1.5">Reward (MNT)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={createForm.rewardMnt}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, rewardMnt: e.target.value }))}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm font-mono text-zinc-200 focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                  />
+                </div>
+
+                {/* Min severity */}
+                <div>
+                  <label className="text-xs font-mono uppercase text-zinc-400 block mb-1.5">Min Severity</label>
+                  <select
+                    value={createForm.severity}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, severity: e.target.value }))}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-cyan-500/60 transition-all appearance-none"
+                  >
+                    {SEVERITY_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Deadline */}
+              <div>
+                <label className="text-xs font-mono uppercase text-zinc-400 block mb-1.5">Deadline (days from now)</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={createForm.deadlineDays}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, deadlineDays: e.target.value }))}
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm font-mono text-zinc-200 focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                />
+              </div>
+
+              {/* Error */}
+              {createError && (
+                <p className="text-xs text-rose-400 font-mono bg-rose-500/5 border border-rose-500/20 rounded-lg p-3">
+                  {createError.message?.split("\n")[0] ?? "Transaction failed"}
+                </p>
+              )}
+
+              {/* Tx success */}
+              {createHash && (
+                <div className="text-xs text-emerald-400 font-mono bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3">
+                  {isConfirming ? "⏳ Waiting for confirmation..." : "✓ Bounty created!"}
+                  <a
+                    href={`https://sepolia.mantlescan.xyz/tx/${createHash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block mt-1 text-cyan-400 hover:underline truncate"
+                  >
+                    Tx: {createHash}
+                  </a>
+                </div>
+              )}
+
+              {/* Submit */}
+              {isCreateSuccess ? (
+                <button
+                  onClick={closeCreateModal}
+                  className="w-full py-3 rounded-xl font-semibold text-sm bg-emerald-600 text-white hover:bg-emerald-500 transition-all"
+                >
+                  Done
+                </button>
+              ) : !isConnected ? (
+                <button
+                  onClick={login}
+                  className="w-full py-3 rounded-xl font-semibold text-sm bg-zinc-800 border border-zinc-700 text-zinc-200 hover:border-zinc-600 transition-all"
+                >
+                  Connect Wallet
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-[10px] text-zinc-600 font-mono text-right">
+                    Connected: {address?.substring(0, 10)}...{address?.substring(34)}
+                  </p>
+                  <button
+                    onClick={submitCreateBounty}
+                    disabled={isCreating || isConfirming || !createForm.targetContract.startsWith("0x")}
+                    className="w-full py-3 rounded-xl font-semibold text-sm bg-linear-to-r from-cyan-500 to-purple-600 text-white hover:from-cyan-400 hover:to-purple-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    {isCreating ? "Confirm in wallet..." : isConfirming ? "Confirming..." : `Create Bounty · ${createForm.rewardMnt || "0"} MNT`}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
