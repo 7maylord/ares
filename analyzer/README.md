@@ -10,13 +10,35 @@ Python microservice that performs smart contract security analysis. Exposes a Fa
 - **Heimdall** — bytecode decompiler (fallback when no verified source is available)
 - **solc-select** — manages multiple Solidity compiler versions for Slither
 
+## LLM backends
+
+Priority order — first available is used:
+
+| Backend | Env var required | Notes |
+|---------|-----------------|-------|
+| Anthropic Claude | `ANTHROPIC_API_KEY` | Best quality, paid API |
+| Ollama (local) | `OLLAMA_BASE_URL` + `OLLAMA_MODEL` | Free, runs on your machine |
+| None | — | Slither still runs; LLM findings disabled |
+
+If Claude fails mid-request, Ollama is tried automatically as a fallback.
+
+**Ollama quick start:**
+```bash
+# Install: https://ollama.com
+ollama pull llama3:8b       # or codellama:13b, mistral, deepseek-coder, etc.
+export OLLAMA_BASE_URL=http://localhost:11434
+export OLLAMA_MODEL=llama3:8b
+```
+
 ## Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/` | Health check |
+| `GET` | `/` | Health check + LLM backend info |
 | `POST` | `/analyze` | Analyze a contract |
 | `POST` | `/feedback` | Submit finding feedback (used by gateway) |
+| `POST` | `/ingest` | Trigger knowledge base population (background) |
+| `GET` | `/ingest/status` | Check ChromaDB document count |
 
 ### `POST /analyze`
 
@@ -85,17 +107,62 @@ docker compose up analyzer
 
 ## RAG knowledge base
 
-The vector store lives in `rag/chroma_db/`. It is **not** seeded automatically. After the first deploy:
+The vector store lives in `rag/chroma_db/`. It is not committed to git and must be seeded after cloning.
+
+### Storage
+
+| Directory | Size | Keep in production? |
+|-----------|------|-------------------|
+| `rag/chroma_db/` | ~1.2 GB | Yes — this is the vector DB |
+| `rag/.cache/` | ~7 GB | No — delete after ingest to reclaim space |
+| `rag/training_data/` | ~50 MB | Optional — only needed for fine-tuning |
+
+Production storage requirement: **~1.2 GB** for ChromaDB only.
+
+### Sources
+
+| Script | Source | What it ingests |
+|--------|--------|----------------|
+| `ingest_vulndb.py` | tintinweb/smart-contract-vulndb | ~38k findings (JSONL audit reports) |
+| `ingest_solodit_api.py` | solodit.cyfrin.io | Critical/High/Medium findings via REST API |
+| `ingest_code4rena.py` | code-423n4 GitHub org | Individual finding `.md` files per contest |
+| `ingest_sherlock.py` | sherlock-audit GitHub org | Judging repo findings (markdown + CSV) |
+| `ingest_github_reports.py` | pashov, NethermindEth, etc. | Mixed MD/PDF audit repos (~4.5k findings) |
+
+A full run produces ~62,000+ findings in ChromaDB.
+
+### First-time setup (after cloning)
 
 ```bash
-# Ingest Solodit findings
-docker compose exec analyzer python -m analyzer.rag.ingest_solodit --all
+cd /path/to/ares
+source analyzer/venv/bin/activate
 
-# Or ingest from local vulnerability DB
-docker compose exec analyzer python -m analyzer.rag.ingest_vulndb
+# Optional but recommended — raises GitHub API limit from 60 to 5000 req/hr
+export GITHUB_TOKEN=ghp_...
+
+python -m analyzer.rag.ingest_all --since 2021-01-01 --max-repos 200
 ```
 
-Without seeding, the LLM still runs but has no retrieval context — findings quality degrades.
+Takes 1–2 hours. Once complete, delete the clone cache to free ~7 GB:
+
+```bash
+rm -rf analyzer/rag/.cache/
+```
+
+### Re-run or update
+
+```bash
+# Add new findings from recent contests (fast — skips already-ingested docs)
+python -m analyzer.rag.ingest_all --since 2025-01-01 --max-repos 50
+
+# Or trigger via HTTP while the server is running:
+curl -X POST http://localhost:8000/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"since": "2025-01-01", "max_repos": 50}'
+
+# Check document count:
+curl http://localhost:8000/ingest/status
+```
 
 ## Tests
 

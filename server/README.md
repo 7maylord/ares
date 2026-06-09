@@ -84,7 +84,7 @@ pnpm run start:dev    # starts on port 3001
 | `ESCROW_ADDRESS` | Yes | Deployed `BountyEscrow` address |
 | `AGENT_PRIVATE_KEY` | Yes | Agent wallet private key for on-chain submissions |
 | `ANALYZER_SERVICE_URL` | Yes | Python analyzer URL (default: `http://localhost:8000`) |
-| `ANTHROPIC_API_KEY` | Yes | Anthropic API key (used by the Python analyzer) |
+| `ANTHROPIC_API_KEY` | No | Anthropic API key (used by the Python analyzer — falls back to Ollama if unset) |
 | `PAYMENT_ADDRESS` | No | Address that receives MNT for `/audit` (default: `0x2986F9236991F156aEfB94F369551a95E67F0aCc`) |
 
 ## Running Tests

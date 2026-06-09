@@ -20,7 +20,7 @@ AnalyzerService ◄──────── Heimdall decompiler (pseudo-Solidity
         ▼
 Python Analyzer (/analyze)
   ├── Slither static analysis
-  └── Claude RAG (10,000+ findings from ChromaDB)
+  └── LLM RAG (62,000+ findings from ChromaDB)
         │
         ▼
 SubmitterService ──► BountyPool.submitFinding() on-chain
@@ -48,13 +48,15 @@ The on-chain infrastructure deployed on Mantle Sepolia. It consists of:
 The AI-driven microservice responsible for deep vulnerability analysis. It:
 - Runs **Slither** static analysis on verified Solidity source.
 - Decompiles raw bytecode (via **Heimdall** or opcode disassembly) for unverified contracts.
-- Queries **Claude** with RAG context drawn from 10,000+ real audit findings (ChromaDB).
+- Queries an LLM (Claude or Ollama fallback) with RAG context drawn from 62,000+ real audit findings (ChromaDB).
 - Exposes a `POST /feedback` endpoint so verified/rejected findings flow back into the knowledge base.
 
-Run the ingestion pipeline once to populate ChromaDB before starting the analyzer:
+Run the ingestion pipeline once after cloning to populate ChromaDB (~1–2 hours, ~1.2 GB of storage):
 ```bash
-cd analyzer
-python -m analyzer.rag.ingest_solodit --all   # seeds + vulndb + GitHub repos + Solodit API
+source analyzer/venv/bin/activate
+export GITHUB_TOKEN=ghp_...   # optional but recommended — avoids GitHub rate limits
+python -m analyzer.rag.ingest_all --since 2021-01-01 --max-repos 200
+rm -rf analyzer/rag/.cache/   # delete clone cache after ingest to reclaim ~7 GB
 ```
 
 ### 3. `server/` (NestJS / TypeScript)
@@ -85,7 +87,9 @@ To run the full stack locally:
    cd analyzer
    python -m venv venv && source venv/bin/activate
    pip install -r requirements.txt
-   python -m analyzer.rag.ingest_solodit --all  # populate knowledge base (run once)
+   cd ..
+   python -m analyzer.rag.ingest_all --since 2021-01-01 --max-repos 200  # run once, ~1-2 hrs
+   rm -rf analyzer/rag/.cache/                                            # reclaim ~7 GB after
    uvicorn analyzer.main:app --port 8000 --reload
    ```
 3. **Server**: Copy `server/.env.sample` to `server/.env` and fill in all values (see table below). Then:

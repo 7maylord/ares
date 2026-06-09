@@ -35,10 +35,9 @@ slither_runner = SlitherRunner()
 poc_validator = PoCValidator()
 # Lazy load LLM RAG runner only if API key is present, to prevent crash on startup if missing
 try:
-    if os.getenv("ANTHROPIC_API_KEY"):
-        llm_rag_runner = LLMRagRunner()
-    else:
-        logger.warning("ANTHROPIC_API_KEY not found in environment. LLM RAG analysis will be disabled.")
+    llm_rag_runner = LLMRagRunner()
+    # LLMRagRunner logs its own backend selection (Claude / Ollama / none)
+    if not os.getenv("ANTHROPIC_API_KEY") and not os.getenv("OLLAMA_MODEL"):
         llm_rag_runner = None
 except Exception as e:
     logger.error(f"Failed to initialize LLM RAG runner: {e}")
@@ -119,3 +118,48 @@ def analyze_contract(request: AnalyzeRequest):
         details=all_findings,
         source_type=source_type,
     )
+
+
+class IngestRequest(BaseModel):
+    since: Optional[str] = "2023-01-01"
+    max_repos: Optional[int] = 60
+
+
+@app.post("/ingest")
+def trigger_ingest(request: IngestRequest):
+    """
+    Trigger knowledge base population from all audit sources.
+    Runs in the background — returns immediately with a status message.
+    Long-running (can take 30-60 min for a full ingest).
+    """
+    import threading
+    from analyzer.rag.ingest_all import run as run_ingest
+
+    def _bg():
+        try:
+            run_ingest(since=request.since, max_repos=request.max_repos)
+        except Exception as e:
+            logger.error(f"Background ingest failed: {e}")
+
+    t = threading.Thread(target=_bg, daemon=True)
+    t.start()
+    return {
+        "status": "started",
+        "message": f"Ingesting from all sources (since={request.since}, max_repos={request.max_repos}). Check server logs for progress.",
+    }
+
+
+@app.get("/ingest/status")
+def ingest_status():
+    """Return current ChromaDB document count."""
+    try:
+        import chromadb
+        from pathlib import Path
+        db_dir = Path(__file__).parent / "rag" / "chroma_db"
+        if not db_dir.exists():
+            return {"count": 0, "status": "empty"}
+        client = chromadb.PersistentClient(path=str(db_dir))
+        col = client.get_or_create_collection("audit_findings")
+        return {"count": col.count(), "status": "ready"}
+    except Exception as e:
+        return {"count": 0, "status": "error", "detail": str(e)}

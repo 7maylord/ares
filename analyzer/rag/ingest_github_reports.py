@@ -100,8 +100,12 @@ def _extract_findings_from_markdown(text: str) -> list[dict[str, Any]]:
     return findings
 
 
+_PDF_WARNED = False
+
+
 def _extract_findings_from_pdf(pdf_path: Path) -> list[dict[str, Any]]:
     """Extract text from a PDF and parse it like Markdown."""
+    global _PDF_WARNED
     try:
         import pdfplumber
     except ImportError:
@@ -114,7 +118,9 @@ def _extract_findings_from_pdf(pdf_path: Path) -> list[dict[str, Any]]:
                     page.extract_text() or "" for page in reader.pages
                 )
         except ImportError:
-            logger.warning("Neither pdfplumber nor PyPDF2 installed — skipping PDFs")
+            if not _PDF_WARNED:
+                logger.warning("Neither pdfplumber nor PyPDF2 installed — skipping PDFs. Run: pip install pdfplumber")
+                _PDF_WARNED = True
             return []
         text = _read(pdf_path)
     else:
