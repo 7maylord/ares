@@ -45,16 +45,21 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# --- ChromaDB and training data live in volumes (persisted across restarts) ---
-VOLUME ["/app/analyzer/rag/chroma_db", "/app/analyzer/rag/training_data"]
+RUN chmod +x entrypoint.sh
 
-# --- One-time RAG seeding ---
-# Run this manually after first deploy:
-#   docker compose exec analyzer python -m analyzer.rag.ingest_solodit --all
+# --- ChromaDB and training data live in volumes (persisted across restarts) ---
+# Mount a named volume here so the DB survives container rebuilds.
+# docker-compose.yml maps: analyzer_rag:/app/analyzer/rag/chroma_db
+VOLUME ["/app/analyzer/rag/chroma_db", "/app/analyzer/rag/training_data"]
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+# Longer start period — ingest runs in background on first boot
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
     CMD curl -f http://localhost:8000/ || exit 1
 
-CMD ["uvicorn", "analyzer.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Env vars to control ingest behaviour (override in docker-compose or at runtime)
+ENV INGEST_SINCE=2021-01-01
+ENV INGEST_MAX_REPOS=200
+
+CMD ["./entrypoint.sh"]

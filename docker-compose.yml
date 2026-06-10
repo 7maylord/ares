@@ -25,16 +25,22 @@ services:
       - "8000:8000"
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      INGEST_SINCE: ${INGEST_SINCE:-2021-01-01}
+      INGEST_MAX_REPOS: ${INGEST_MAX_REPOS:-200}
     volumes:
-      # Persist ChromaDB and training data across container restarts/upgrades
+      # Named volumes persist ChromaDB across container restarts and rebuilds.
+      # On first boot the entrypoint auto-runs ingest_all in the background.
+      # On subsequent boots it detects the existing DB and skips ingest.
       - chroma_data:/app/analyzer/rag/chroma_db
       - training_data:/app/analyzer/rag/training_data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
       timeout: 5s
-      start_period: 15s
-      retries: 3
+      # API starts immediately; ingest runs in background — no need for long start_period
+      start_period: 30s
+      retries: 5
 
   # ── NestJS Orchestrator ─────────────────────────────────────────────────────
   server:

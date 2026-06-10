@@ -109,7 +109,7 @@ To run the full stack locally:
 | `ESCROW_ADDRESS` | Deployed `BountyEscrow` contract address |
 | `AGENT_PRIVATE_KEY` | Private key for the agent wallet (never use your main wallet) |
 | `ANALYZER_SERVICE_URL` | URL of the Python analyzer (default: `http://localhost:8000`) |
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude LLM analysis |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude LLM analysis (optional — falls back to Ollama if unset) |
 | `PAYMENT_ADDRESS` | Address that receives MNT for the paid `/audit` endpoint (default: `0x2986F9236991F156aEfB94F369551a95E67F0aCc`) |
 
 ---
