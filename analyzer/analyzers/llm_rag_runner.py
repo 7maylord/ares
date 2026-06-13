@@ -68,6 +68,19 @@ def _strip_markdown_fences(text: str) -> str:
 
 def _parse_llm_response(raw: str) -> list[dict]:
     content = _strip_markdown_fences(raw)
+    if not content:
+        logger.warning("LLM returned empty response")
+        return []
+    # If Claude prefixed the JSON with explanation text, find the array/object
+    if not content.startswith(("[", "{")):
+        start = content.find("[")
+        obj_start = content.find("{")
+        if start == -1 and obj_start == -1:
+            logger.warning("LLM response contains no JSON: %s", content[:200])
+            return []
+        if start == -1 or (obj_start != -1 and obj_start < start):
+            start = obj_start
+        content = content[start:]
     parsed = json.loads(content)
     if isinstance(parsed, dict):
         return parsed.get("vulnerabilities", parsed.get("findings", []))
@@ -141,7 +154,10 @@ class LLMRagRunner:
             temperature=0.1,
             max_tokens=4000,
         )
-        return _parse_llm_response(response.content[0].text)
+        raw = response.content[0].text if response.content else ""
+        if response.stop_reason == "max_tokens":
+            logger.warning("Claude hit max_tokens — response may be truncated")
+        return _parse_llm_response(raw)
 
     def _call_ollama(self, user_prompt: str) -> list[dict]:
         full_prompt = f"{SYSTEM_PROMPT}\n\n{user_prompt}"

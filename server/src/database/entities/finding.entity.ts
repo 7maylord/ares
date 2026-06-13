@@ -39,7 +39,10 @@ export class FindingEntity {
   status: string; // Pending | Verified | Rejected
 
   @Column({ nullable: true })
-  txHash: string;
+  txHash: string; // submission tx
+
+  @Column({ nullable: true })
+  payoutTxHash: string; // escrow verify / payout tx
 
   @CreateDateColumn()
   submittedAt: Date;

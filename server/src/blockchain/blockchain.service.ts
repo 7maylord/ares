@@ -405,6 +405,7 @@ export class BlockchainService implements OnModuleInit {
 
     await this.findingsService.updateByBountyId(bountyId, {
       status: 'Verified',
+      payoutTxHash: txHash,
     });
     await this.bountiesService.updateByBountyId(bountyId, {
       status: 'VERIFIED',

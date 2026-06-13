@@ -23,7 +23,7 @@ import {UnprotectedUpgrade} from "../src/targets/UnprotectedUpgrade.sol";
 contract DeployTargets is Script {
     // 1 MNT reward per bounty, deadline 30 days, min severity High
     uint256 constant REWARD = 5 ether;
-    uint8 constant SEVERITY = 2; // Severity.High
+    BountyPool.Severity constant SEVERITY = BountyPool.Severity.High;
     uint256 constant DAYS_30 = 30 days;
 
     function run() external {

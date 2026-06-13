@@ -61,6 +61,7 @@ interface Finding {
   remediation?: string;
   status: "Pending" | "Verified" | "Rejected";
   txHash?: string;
+  payoutTxHash?: string;
   submittedAt: string;
 }
 
@@ -578,14 +579,27 @@ export default function Dashboard() {
                         )}
                         {f.txHash && (
                           <div>
-                            <h4 className="text-xs font-mono uppercase text-zinc-500 mb-1">Tx Hash</h4>
+                            <h4 className="text-xs font-mono uppercase text-zinc-500 mb-1">Submission Tx</h4>
                             <a
                               href={`https://sepolia.mantlescan.xyz/tx/${f.txHash}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-cyan-400 font-mono text-xs truncate hover:underline"
+                              className="text-cyan-400 font-mono text-xs hover:underline"
                             >
                               {`${f.txHash.slice(0, 10)}...${f.txHash.slice(-8)}`}
+                            </a>
+                          </div>
+                        )}
+                        {f.payoutTxHash && (
+                          <div>
+                            <h4 className="text-xs font-mono uppercase text-zinc-500 mb-1">Payout Tx</h4>
+                            <a
+                              href={`https://sepolia.mantlescan.xyz/tx/${f.payoutTxHash}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-emerald-400 font-mono text-xs hover:underline"
+                            >
+                              {`${f.payoutTxHash.slice(0, 10)}...${f.payoutTxHash.slice(-8)}`}
                             </a>
                           </div>
                         )}
