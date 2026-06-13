@@ -20,10 +20,11 @@ export class SubmitterService {
     }
     this.account = privateKeyToAccount(pk as `0x${string}`);
     
+    const rpcUrl = this.configService.get<string>('MANTLE_SEPOLIA_RPC_URL');
     this.client = createWalletClient({
       account: this.account,
       chain: mantleSepoliaTestnet,
-      transport: http()
+      transport: http(rpcUrl),
     }).extend(publicActions);
 
     const abiPath = path.join(__dirname, '..', 'abi', 'BountyPool.abi.json');

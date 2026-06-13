@@ -71,11 +71,21 @@ The backend gateway API that orchestrates the full flow:
 ### 4. `client/` (Next.js / React)
 The user-facing dashboard where protocol owners can create new bounties, fund them, and view the status of their smart contracts. Security researchers (and autonomous agents) can view active bounties and submit Proof-of-Concepts (PoCs).
 
+## Live Deployments
+
+| Service | URL |
+|---------|-----|
+| Dashboard (Vercel) | https://ares-x.vercel.app |
+| API Server (Render) | https://ares-server-97ef.onrender.com |
+| Analyzer (Render) | https://ares-analyzer.onrender.com |
+
 ## Deployed Contracts (Mantle Sepolia)
 
-- **ReputationLedger**: `0x2986F9236991F156aEfB94F369551a95E67F0aCc`
-- **BountyPool**: `0x9Bc25B223787Ce045e8B5C19A2547B3b1eBDA1D8`
-- **BountyEscrow**: `0x084D072416984F89d9dfF6548A357C88aE7A39Fe`
+| Contract | Address |
+|----------|---------|
+| ReputationLedger | [`0x2986F9236991F156aEfB94F369551a95E67F0aCc`](https://sepolia.mantlescan.xyz/address/0x2986F9236991F156aEfB94F369551a95E67F0aCc) |
+| BountyPool | [`0x9Bc25B223787Ce045e8B5C19A2547B3b1eBDA1D8`](https://sepolia.mantlescan.xyz/address/0x9Bc25B223787Ce045e8B5C19A2547B3b1eBDA1D8) |
+| BountyEscrow | [`0x084D072416984F89d9dfF6548A357C88aE7A39Fe`](https://sepolia.mantlescan.xyz/address/0x084D072416984F89d9dfF6548A357C88aE7A39Fe) |
 
 ## Getting Started
 
@@ -126,7 +136,7 @@ Any developer or AI agent can request a one-shot security audit without creating
    ```
 2. Call `POST /audit` with the contract address and your transaction hash:
    ```bash
-   curl -X POST http://localhost:3001/audit \
+   curl -X POST https://ares-server-97ef.onrender.com/audit \
      -H "Content-Type: application/json" \
      -d '{
        "contractAddress": "0xYourContractAddress",

@@ -38,9 +38,10 @@ export class BlockchainService implements OnModuleInit {
       this.configService.get<string>('REPUTATION_ADDRESS') ??
       '0x2986F9236991F156aEfB94F369551a95E67F0aCc';
 
+    const rpcUrl = this.configService.get<string>('MANTLE_SEPOLIA_RPC_URL');
     this.client = createPublicClient({
       chain: mantleSepoliaTestnet,
-      transport: http(),
+      transport: http(rpcUrl),
     });
 
     const abiPath = path.join(__dirname, '..', 'abi', 'BountyPool.abi.json');

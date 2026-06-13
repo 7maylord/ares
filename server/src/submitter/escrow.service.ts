@@ -20,10 +20,11 @@ export class EscrowService {
     }
     const account = privateKeyToAccount(pk as `0x${string}`);
 
+    const rpcUrl = this.configService.get<string>('MANTLE_SEPOLIA_RPC_URL');
     this.client = createWalletClient({
       account,
       chain: mantleSepoliaTestnet,
-      transport: http(),
+      transport: http(rpcUrl),
     }).extend(publicActions);
 
     const escrowAddress = this.configService.get<string>('ESCROW_ADDRESS');
