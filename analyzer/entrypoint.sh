@@ -12,6 +12,11 @@ start_server() {
   exec uvicorn analyzer.main:app --host 0.0.0.0 --port "${PORT:-8000}"
 }
 
+if [ "${DISABLE_RAG:-false}" = "true" ]; then
+  echo "[entrypoint] DISABLE_RAG=true — skipping ingest, starting server without RAG"
+  start_server
+fi
+
 if [ -f "$LOCK_FILE" ]; then
   echo "[entrypoint] ChromaDB already seeded — skipping ingest"
   start_server
@@ -27,7 +32,6 @@ fi
 echo "[entrypoint] ChromaDB is empty — running ingest_all in background"
 echo "[entrypoint] Server will start immediately; ingest progress visible in logs"
 
-# Run ingest in background, touch lock file when done
 (
   python -m analyzer.rag.ingest_all \
     --since "${INGEST_SINCE:-2021-01-01}" \

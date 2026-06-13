@@ -104,6 +104,9 @@ class LLMRagRunner:
             return False
 
     def _init_vectordb(self):
+        if os.getenv("DISABLE_RAG", "false").lower() == "true":
+            logger.info("DISABLE_RAG=true — ChromaDB and embedding model disabled")
+            return
         if not os.path.exists(DB_DIR):
             return
         try:
