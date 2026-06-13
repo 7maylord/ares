@@ -1,20 +1,27 @@
 services:
 
   # ── Python Analyzer ─────────────────────────────────────────────────────────
-  # Private service — only reachable by other Render services, not the public internet
+  # Runs Slither + LLM RAG analysis. On first boot, auto-seeds ChromaDB via
+  # entrypoint.sh (runs ingest_all in the background, server starts immediately).
   - type: web
     name: ares-analyzer
     runtime: docker
     dockerfilePath: ./analyzer/Dockerfile
     dockerContext: ./analyzer
-    plan: starter
+    plan: standard                 # starter has too little RAM for embedding model
     envVars:
       - key: ANTHROPIC_API_KEY
-        sync: false        # paste in the Render dashboard
+        sync: false                # paste value in Render dashboard
+      - key: GITHUB_TOKEN
+        sync: false                # optional — raises GitHub rate limit to 5000/hr
+      - key: INGEST_SINCE
+        value: "2021-01-01"
+      - key: INGEST_MAX_REPOS
+        value: "100"               # per source; lower = less ephemeral disk during ingest
     disk:
       name: chroma-data
       mountPath: /app/analyzer/rag/chroma_db
-      sizeGB: 5
+      sizeGB: 10                   # ChromaDB ~1.2 GB today; room to grow
 
   # ── NestJS Orchestrator ──────────────────────────────────────────────────────
   - type: web
@@ -25,40 +32,28 @@ services:
     plan: starter
     envVars:
       - key: PORT
-        value: 3001
+        value: "3001"
       - key: DATABASE_URL
         sync: false
       - key: MANTLE_SEPOLIA_RPC_URL
-        value: https://rpc.sepolia.mantle.xyz
+        value: "https://rpc.sepolia.mantle.xyz"
       - key: MANTLESCAN_API_KEY
         sync: false
       - key: POOL_ADDRESS
-        value: 0x9Bc25B223787Ce045e8B5C19A2547B3b1eBDA1D8
+        value: "0x9Bc25B223787Ce045e8B5C19A2547B3b1eBDA1D8"
       - key: ESCROW_ADDRESS
-        value: 0x084D072416984F89d9dfF6548A357C88aE7A39Fe
+        value: "0x084D072416984F89d9dfF6548A357C88aE7A39Fe"
+      - key: REPUTATION_ADDRESS
+        value: "0x2986F9236991F156aEfB94F369551a95E67F0aCc"
       - key: AGENT_PRIVATE_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: PAYMENT_ADDRESS
+        value: "0x2986F9236991F156aEfB94F369551a95E67F0aCc"
+      # Internal Render URL — ares-analyzer listens on PORT (10000 by default on Render)
       - key: ANALYZER_SERVICE_URL
-        value: http://ares-analyzer:10000   # Render internal service URL (default port 10000)
-      # FUTURE: restore when Redis is re-enabled
-      # - key: REDIS_HOST
-      #   fromService:
-      #     name: ares-redis
-      #     type: redis
-      #     property: host
-      # - key: REDIS_PORT
-      #   fromService:
-      #     name: ares-redis
-      #     type: redis
-      #     property: port
-
-  # ── FUTURE: Redis ────────────────────────────────────────────────────────────
-  # Re-enable when adding BullMQ for job durability and retries.
-  # Also restore REDIS_HOST / REDIS_PORT in ares-server envVars above.
-  #
-  # - type: redis
-  #   name: ares-redis
-  #   plan: starter
-  #   ipAllowList: []        # only allow internal Render network access
+        fromService:
+          name: ares-analyzer
+          type: web
+          property: hostport

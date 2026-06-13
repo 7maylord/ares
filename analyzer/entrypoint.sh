@@ -8,7 +8,8 @@ DB_DIR="/app/analyzer/rag/chroma_db"
 LOCK_FILE="$DB_DIR/.ingest_complete"
 
 start_server() {
-  exec uvicorn analyzer.main:app --host 0.0.0.0 --port 8000
+  # Render injects PORT=10000; local default is 8000
+  exec uvicorn analyzer.main:app --host 0.0.0.0 --port "${PORT:-8000}"
 }
 
 if [ -f "$LOCK_FILE" ]; then

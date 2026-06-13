@@ -17,11 +17,22 @@ Env:
 
 import argparse
 import logging
+import shutil
 import time
 from pathlib import Path
 
 import chromadb
 from chromadb.utils import embedding_functions
+
+CACHE_DIR = Path(__file__).parent / ".cache"
+
+
+def _cleanup_cache(subdir: str) -> None:
+    """Delete a clone cache directory after ingestion to free ephemeral disk."""
+    target = CACHE_DIR / subdir
+    if target.exists():
+        shutil.rmtree(target, ignore_errors=True)
+        logger.info(f"Cleaned up clone cache: {target}")
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +51,7 @@ def run(since: str = "2023-01-01", max_repos: int = 60) -> None:
     col = _get_collection()
     results: dict[str, int] = {}
 
-    # 1. VulnDB (fastest — no network clones needed after first run)
+    # 1. VulnDB
     logger.info("=" * 50)
     logger.info("Source 1/5: tintinweb/smart-contract-vulndb")
     try:
@@ -49,8 +60,10 @@ def run(since: str = "2023-01-01", max_repos: int = 60) -> None:
     except Exception as e:
         logger.error(f"vulndb failed: {e}")
         results["vulndb"] = 0
+    finally:
+        _cleanup_cache("smart-contract-vulndb")
 
-    # 2. Solodit API
+    # 2. Solodit API (no clone cache)
     logger.info("=" * 50)
     logger.info("Source 2/5: Solodit API")
     try:
@@ -69,8 +82,9 @@ def run(since: str = "2023-01-01", max_repos: int = 60) -> None:
     except Exception as e:
         logger.error(f"Code4rena failed: {e}")
         results["code4rena"] = 0
+    finally:
+        _cleanup_cache("code4rena")
 
-    # Small pause to avoid GitHub secondary rate limits
     time.sleep(5)
 
     # 4. Sherlock
@@ -82,6 +96,8 @@ def run(since: str = "2023-01-01", max_repos: int = 60) -> None:
     except Exception as e:
         logger.error(f"Sherlock failed: {e}")
         results["sherlock"] = 0
+    finally:
+        _cleanup_cache("sherlock")
 
     time.sleep(5)
 
@@ -94,6 +110,8 @@ def run(since: str = "2023-01-01", max_repos: int = 60) -> None:
     except Exception as e:
         logger.error(f"GitHub repos failed: {e}")
         results["github"] = 0
+    finally:
+        _cleanup_cache("audit_repos")
 
     # Summary
     total = sum(results.values())
