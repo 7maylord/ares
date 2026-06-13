@@ -20,7 +20,7 @@ services:
         value: "100"               # per source; lower = less ephemeral disk during ingest
     disk:
       name: chroma-data
-      mountPath: /app/analyzer/rag/chroma_db
+      mountPath: /workspace/analyzer/rag/chroma_db
       sizeGB: 10                   # ChromaDB ~1.2 GB today; room to grow
 
   # ── NestJS Orchestrator ──────────────────────────────────────────────────────

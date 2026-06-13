@@ -4,7 +4,7 @@
 # then starts the API server immediately so healthchecks pass.
 # On subsequent boots, skips ingest and starts the server directly.
 
-DB_DIR="/app/analyzer/rag/chroma_db"
+DB_DIR="/workspace/analyzer/rag/chroma_db"
 LOCK_FILE="$DB_DIR/.ingest_complete"
 
 start_server() {
