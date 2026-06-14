@@ -58,7 +58,7 @@ export default function LandingPage() {
   // Terminal simulator states
   const [simulatorPhase, setSimulatorPhase] = useState<"SCANNING" | "ALERT" | "EXPLOITING" | "SETTLED">("SCANNING");
   const [manualOverride, setManualOverride] = useState(false);
-  const terminalBottomRef = useRef<HTMLDivElement>(null);
+  const terminalScrollRef = useRef<HTMLDivElement>(null);
 
   // Playground calculator states
   const [targetAddress, setTargetAddress] = useState("0x71C2...4b9e");
@@ -110,10 +110,10 @@ export default function LandingPage() {
     return () => clearInterval(interval);
   }, [manualOverride]);
 
-  // Autoscroll terminal
+  // Autoscroll terminal container only — never the page
   useEffect(() => {
-    if (terminalBottomRef.current) {
-      terminalBottomRef.current.scrollIntoView({ behavior: "smooth" });
+    if (terminalScrollRef.current) {
+      terminalScrollRef.current.scrollTop = terminalScrollRef.current.scrollHeight;
     }
   }, [simulatorPhase]);
 
@@ -333,7 +333,7 @@ export default function LandingPage() {
               </div>
 
               {/* Window Body */}
-              <div className="bg-zinc-950/50 p-6 min-h-[320px] max-h-[320px] overflow-y-auto font-mono text-xs text-zinc-400 custom-scrollbar flex flex-col justify-between relative">
+              <div ref={terminalScrollRef} className="bg-zinc-950/50 p-6 min-h-[320px] max-h-[320px] overflow-y-auto font-mono text-xs text-zinc-400 custom-scrollbar flex flex-col justify-between relative">
                 {/* Scanline laser animation */}
                 {simulatorPhase === "SCANNING" && (
                   <div className="absolute inset-x-0 h-0.5 bg-cyan-500/20 shadow-[0_0_10px_#06b6d4] animate-scan pointer-events-none" />
@@ -354,7 +354,6 @@ export default function LandingPage() {
                       </div>
                     );
                   })}
-                  <div ref={terminalBottomRef} />
                 </div>
 
                 {/* Simulated Code Panel (Appears on specific states) */}
