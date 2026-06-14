@@ -1,7 +1,5 @@
-prd.md
-implementation_plan.md
-implementation_plan2.md
-task.md
+demo-script.md
+demo-script.pdf
 # Environment variables
 .env
 .env.local
