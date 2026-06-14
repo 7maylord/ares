@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState, useRef } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -188,11 +189,7 @@ export default function LandingPage() {
       <nav className="border-b border-zinc-900 bg-zinc-950/70 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-linear-to-br from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
+            <Image src="/logo.png" alt="Ares Logo" width={40} height={40} className="rounded-xl object-cover shadow-lg shadow-cyan-500/20" />
             <div>
               <span className="font-bold text-xl tracking-tight bg-linear-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">ARES</span>
               <span className="text-[10px] block text-zinc-500 font-mono tracking-wider uppercase">Autonomous Auditor</span>

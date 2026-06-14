@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain } from "wagmi";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { parseEther } from "viem";
@@ -268,11 +269,7 @@ export default function Dashboard() {
         <header className="border-b border-zinc-900 bg-zinc-950/70 backdrop-blur-xl sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <Link href="/" className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-linear-to-br from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-              </div>
+              <Image src="/logo.png" alt="Ares Logo" width={40} height={40} className="rounded-xl object-cover shadow-lg shadow-cyan-500/20" />
               <div>
                 <span className="text-xl font-bold tracking-tight bg-linear-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">ARES</span>
                 <span className="text-[10px] block text-zinc-500 font-mono tracking-widest uppercase">Bug Bounty Hunter</span>
@@ -449,8 +446,8 @@ export default function Dashboard() {
               </div>
 
               {/* Live Activity Feed sidebar */}
-              <div className="glass-panel rounded-2xl p-6 flex flex-col min-h-[460px]">
-                <h2 className="text-base font-bold text-zinc-150 mb-5 flex items-center gap-2">
+              <div className="glass-panel rounded-2xl p-6 flex flex-col h-full min-h-[460px]">
+                <h2 className="text-base font-bold text-zinc-150 mb-5 flex items-center gap-2 shrink-0">
                   <svg className="w-4 h-4 text-cyan-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
@@ -463,7 +460,7 @@ export default function Dashboard() {
                     Listening for smart contract events. Logs will populate as transactions update.
                   </div>
                 ) : (
-                  <div className="grow overflow-y-auto space-y-3 max-h-[460px] pr-1.5 text-[11px] custom-scrollbar">
+                  <div className="grow overflow-y-auto space-y-3 pr-1.5 text-[11px] custom-scrollbar h-0 min-h-0">
                     {logs.map((log) => (
                       <div key={log.id} className="p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl flex flex-col gap-1.5 hover:border-zinc-800 transition-all">
                         <div className="flex items-center justify-between">
@@ -540,104 +537,96 @@ export default function Dashboard() {
                   No automated findings generated. Active vulnerabilities appear here once processed by Ares.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-6">
-                  {findings.map((f) => {
-                    const isCritical = f.severity === "Critical";
-                    const isHigh = f.severity === "High";
-                    const borderClass = isCritical ? "border-rose-500/25 bg-rose-950/5 hover:border-rose-500/40"
-                      : isHigh ? "border-orange-500/25 bg-orange-950/5 hover:border-orange-500/40"
-                      : "border-amber-500/20 bg-amber-950/5 hover:border-amber-500/35";
-                    
+                <div className="grid grid-cols-1 gap-4">
+                  {Object.values(
+                    findings.reduce<Record<string, Finding[]>>((acc, f) => {
+                      (acc[f.targetContract] ??= []).push(f);
+                      return acc;
+                    }, {})
+                  ).map((group) => {
+                    const severityRank: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1, Informational: 0 };
+                    const top = group.reduce((a, b) => (severityRank[a.severity] ?? 0) >= (severityRank[b.severity] ?? 0) ? a : b);
+                    const isCritical = top.severity === "Critical";
+                    const isHigh = top.severity === "High";
+                    const isVerified = group.some((f) => f.status === "Verified");
+                    const isPending = group.every((f) => f.status === "Pending");
+                    const payoutTx = group.find((f) => f.payoutTxHash)?.payoutTxHash;
+                    const submissionTx = group.find((f) => f.txHash)?.txHash;
+
                     return (
-                      <div key={f.id} className={`glass-panel rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden transition-all duration-300 ${borderClass}`}>
-                        <div className={`absolute top-0 left-0 bottom-0 w-1 ${
-                          isCritical ? "bg-rose-500" : isHigh ? "bg-orange-500" : "bg-amber-500"
-                        }`} />
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-900 pb-4">
-                          <div>
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <span className="text-[10px] font-mono text-zinc-550 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded">Bounty #{f.bountyId}</span>
-                              <span className="text-xs font-mono text-zinc-400">{f.targetContract}</span>
+                      <Link
+                        key={top.targetContract}
+                        href={`/findings/${top.targetContract}`}
+                        className={`glass-panel rounded-2xl p-5 flex flex-col gap-3 relative overflow-hidden transition-all duration-200 cursor-pointer group
+                          ${isCritical ? "border-rose-500/25 hover:border-rose-500/50" : isHigh ? "border-orange-500/25 hover:border-orange-500/50" : "border-amber-500/20 hover:border-amber-500/40"}`}
+                      >
+                        <div className={`absolute top-0 left-0 bottom-0 w-1 ${isCritical ? "bg-rose-500" : isHigh ? "bg-orange-500" : "bg-amber-500"}`} />
+
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                              <span className="text-[10px] font-mono text-zinc-550 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded">Bounty #{top.bountyId}</span>
+                              <span className="text-[10px] font-mono text-zinc-500 truncate">{top.targetContract}</span>
                             </div>
-                            <h3 className="text-base font-bold text-zinc-100 mt-2">{f.title || "Vulnerability Alert"}</h3>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border
+                                ${isCritical ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                : isHigh ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
+                                : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>
+                                {top.severity}
+                              </span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold font-mono border
+                                ${isVerified ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                : isPending ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse"
+                                : "bg-rose-500/10 text-rose-400 border-rose-500/20"}`}>
+                                {isVerified ? "Verified" : isPending ? "Pending" : "Rejected"}
+                              </span>
+                              <span className="text-[10px] text-zinc-500 font-mono">
+                                {group.length} finding{group.length !== 1 ? "s" : ""}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2.5 shrink-0">
-                            <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold uppercase ${
-                              isCritical ? "bg-rose-500/10 text-rose-455 border border-rose-500/20"
-                              : isHigh   ? "bg-orange-500/10 text-orange-455 border border-orange-500/20"
-                              : "bg-amber-500/10 text-amber-455 border border-amber-500/20"
-                            }`}>{f.severity}</span>
-                            <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold font-mono border ${
-                              f.status === "Verified" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                              : f.status === "Rejected" ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                              : "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse"
-                            }`}>{f.status}</span>
+
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            {payoutTx && (
+                              <a
+                                href={`https://sepolia.mantlescan.xyz/tx/${payoutTx}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-emerald-400 font-mono text-[10px] hover:underline flex items-center gap-1"
+                              >
+                                Payout {payoutTx.slice(0, 8)}...
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                              </a>
+                            )}
+                            {submissionTx && (
+                              <a
+                                href={`https://sepolia.mantlescan.xyz/tx/${submissionTx}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-cyan-400 font-mono text-[10px] hover:underline flex items-center gap-1"
+                              >
+                                Submission {submissionTx.slice(0, 8)}...
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                              </a>
+                            )}
+                            <span className="text-[10px] text-zinc-600 group-hover:text-zinc-400 transition-colors flex items-center gap-1">
+                              View all findings
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                            </span>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-                          <div className="md:col-span-2 space-y-4">
-                            {f.description && (
-                              <div>
-                                <h4 className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1.5">Detailed Description</h4>
-                                <p className="text-zinc-300 leading-relaxed text-sm">{f.description}</p>
-                              </div>
-                            )}
-                            {f.remediation && (
-                              <div>
-                                <h4 className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1.5">Remediation Guide</h4>
-                                <p className="text-zinc-300 bg-zinc-950/70 border border-zinc-900 p-4 rounded-xl font-mono text-xs leading-relaxed custom-scrollbar overflow-x-auto">{f.remediation}</p>
-                              </div>
-                            )}
-                          </div>
-                          <div className="space-y-4.5 border-t md:border-t-0 md:border-l border-zinc-900 pt-4 md:pt-0 md:pl-6">
-                            {f.pocSketch && (
-                              <div>
-                                <h4 className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1">PoC Logic Sketch</h4>
-                                <p className="text-zinc-400 text-xs italic leading-relaxed font-mono bg-zinc-950/30 p-2.5 rounded-lg border border-zinc-900">{f.pocSketch}</p>
-                              </div>
-                            )}
-                            {f.agent && (
-                              <div>
-                                <h4 className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1">Submitting Agent</h4>
-                                <p className="text-zinc-400 font-mono text-xs truncate bg-zinc-950/30 p-2.5 rounded-lg border border-zinc-900">{f.agent}</p>
-                              </div>
-                            )}
-                            {f.txHash && (
-                              <div>
-                                <h4 className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1">Submission Transaction</h4>
-                                <a
-                                  href={`https://sepolia.mantlescan.xyz/tx/${f.txHash}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-cyan-400 font-mono text-xs hover:underline flex items-center gap-1 hover:text-cyan-300 transition-colors"
-                                >
-                                  <span>{`${f.txHash.slice(0, 12)}...${f.txHash.slice(-10)}`}</span>
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                  </svg>
-                                </a>
-                              </div>
-                            )}
-                            {f.payoutTxHash && (
-                              <div>
-                                <h4 className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1">Payout Release Transaction</h4>
-                                <a
-                                  href={`https://sepolia.mantlescan.xyz/tx/${f.payoutTxHash}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-emerald-400 font-mono text-xs hover:underline flex items-center gap-1 hover:text-emerald-300 transition-colors"
-                                >
-                                  <span>{`${f.payoutTxHash.slice(0, 12)}...${f.payoutTxHash.slice(-10)}`}</span>
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                  </svg>
-                                </a>
-                              </div>
-                            )}
-                          </div>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {group.map((f) => (
+                            <span key={f.id} className="text-[9px] font-mono px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 truncate max-w-[200px]">
+                              {f.title || "Finding"}
+                            </span>
+                          ))}
                         </div>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>

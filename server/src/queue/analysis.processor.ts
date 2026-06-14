@@ -77,27 +77,35 @@ export class AnalysisProcessor {
         scannedAt,
       });
 
-      const topFinding = result.details[0];
+      // Persist every finding to the DB
+      const severityRank: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1, Informational: 0 };
+      const sorted = [...result.details].sort(
+        (a, b) => (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0),
+      );
 
-      // Persist the finding before submitting on-chain
-      const finding = await this.findingsService.create({
-        bountyId,
-        targetContract,
-        title: topFinding?.title || 'Vulnerability Found',
-        severity: topFinding?.severity || 'Medium',
-        category: topFinding?.category || 'Static Analysis',
-        description: topFinding?.description || '',
-        pocSketch: topFinding?.poc_sketch || '0x',
-        remediation: topFinding?.remediation || '',
-        status: 'Pending',
-      });
+      const savedFindings = await Promise.all(
+        sorted.map((v) =>
+          this.findingsService.create({
+            bountyId,
+            targetContract,
+            title: v.title || 'Vulnerability Found',
+            severity: v.severity || 'Medium',
+            category: v.category || 'Static Analysis',
+            description: v.description || '',
+            pocSketch: v.poc_sketch || '',
+            remediation: v.remediation || '',
+            status: 'Pending',
+          }),
+        ),
+      );
 
       await this.eventsService.log(
         'FindingSubmitted',
         `Ares Agent found ${result.vulnerabilities_found} vulnerability(s) in Bounty #${bountyId} — submitting on-chain`,
       );
 
-      // Submit on-chain — encode poc_sketch as hex bytes so viem can ABI-encode it
+      // Submit only the highest-severity finding on-chain
+      const topFinding = sorted[0];
       const pocData = toHex(topFinding?.poc_sketch || '');
       const txHash = await this.submitterService.submitFinding(
         poolAddress,
@@ -107,8 +115,8 @@ export class AnalysisProcessor {
         topFinding?.severity || 'High',
       );
 
-      // Update finding record with txHash
-      await this.findingsService.updateById(finding.id, { txHash });
+      // Attach the submission tx to all findings for this bounty
+      await Promise.all(savedFindings.map((f) => this.findingsService.updateById(f.id, { txHash })));
       await this.bountiesService.updateByBountyId(bountyId, { status: 'SUBMITTED' });
 
     } else {

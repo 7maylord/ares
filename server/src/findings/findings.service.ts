@@ -28,4 +28,8 @@ export class FindingsService {
   async findByBountyId(bountyId: number): Promise<FindingEntity | null> {
     return this.repo.findOne({ where: { bountyId }, order: { submittedAt: 'DESC' } });
   }
+
+  async findAllByContract(targetContract: string): Promise<FindingEntity[]> {
+    return this.repo.find({ where: { targetContract }, order: { submittedAt: 'DESC' } });
+  }
 }
