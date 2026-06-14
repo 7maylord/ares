@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain } from "wagmi";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { parseEther } from "viem";
@@ -75,6 +76,7 @@ interface EventLog {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   // ── Data ──────────────────────────────────────────────────────────────────
   const [bounties, setBounties] = useState<Bounty[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
@@ -204,12 +206,9 @@ export default function Dashboard() {
     .reduce((sum, b) => sum + parseFloat(b.rewardAmount || "0"), 0)
     .toFixed(2);
 
-  const totalPayouts = findings
-    .filter((f) => f.status === "Verified")
-    .reduce((sum, f) => {
-      const b = bounties.find((b) => b.bountyId === f.bountyId);
-      return sum + (b ? parseFloat(b.rewardAmount || "0") : 0);
-    }, 0)
+  const totalPayouts = bounties
+    .filter((b) => b.status === "VERIFIED")
+    .reduce((sum, b) => sum + parseFloat(b.rewardAmount || "0"), 0)
     .toFixed(2);
 
   const statusBadge = (status: string) => {
@@ -554,9 +553,12 @@ export default function Dashboard() {
                     const submissionTx = group.find((f) => f.txHash)?.txHash;
 
                     return (
-                      <Link
+                      <div
                         key={top.targetContract}
-                        href={`/findings/${top.targetContract}`}
+                        onClick={(e) => {
+                          if ((e.target as HTMLElement).closest("a")) return;
+                          router.push(`/findings/${top.targetContract}`);
+                        }}
                         className={`glass-panel rounded-2xl p-5 flex flex-col gap-3 relative overflow-hidden transition-all duration-200 cursor-pointer group
                           ${isCritical ? "border-rose-500/25 hover:border-rose-500/50" : isHigh ? "border-orange-500/25 hover:border-orange-500/50" : "border-amber-500/20 hover:border-amber-500/40"}`}
                       >
@@ -626,7 +628,7 @@ export default function Dashboard() {
                             </span>
                           ))}
                         </div>
-                      </Link>
+                      </div>
                     );
                   })}
                 </div>
