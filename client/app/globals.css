@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #09090b;
-  --foreground: #f4f4f5;
+  --background: #0c0a08;
+  --foreground: #ede6d6;
   --accent-cyan: #06b6d4;
   --accent-purple: #a855f7;
   --card-bg: rgba(15, 15, 20, 0.45);
@@ -10,11 +10,58 @@
   --glass-blur: 16px;
 }
 
+/* ── War-room design system (redesign foundation) ─────────────────────────
+   Additive: existing pages keep using zinc/cyan Tailwind utilities untouched.
+   New surfaces opt in via these tokens (bg-ash, text-bronze, font-display…). */
+:root {
+  --ash: #0c0a08;        /* warm obsidian ground — a forge, not a screen */
+  --iron: #1a1713;       /* raised panels */
+  --steel: #3a3733;      /* borders, hairlines, structure */
+  --bone: #ede6d6;       /* carved text / marble */
+  --bronze: #c8a24b;     /* the agent — active / primary */
+  --bronze-deep: #8a6b2e;/* bronze at rest, muted labels */
+  --blood: #d6402f;      /* vulnerability / critical / strike */
+  --verdigris: #4a9e86;  /* verified / secured / paid (oxidized bronze) */
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* War-room tokens */
+  --color-ash: var(--ash);
+  --color-iron: var(--iron);
+  --color-steel: var(--steel);
+  --color-bone: var(--bone);
+  --color-bronze: var(--bronze);
+  --color-bronze-deep: var(--bronze-deep);
+  --color-blood: var(--blood);
+  --color-verdigris: var(--verdigris);
+
+  /* Numbered accent ramps — let existing shade+opacity utilities resolve after
+     the cyan/purple→bronze, rose→blood, emerald→verdigris family swaps. */
+  --color-bronze-200: #e8d29a;
+  --color-bronze-300: #dcc077;
+  --color-bronze-350: #d3b566;
+  --color-bronze-400: #cda94f;
+  --color-bronze-500: #c8a24b;
+  --color-bronze-600: #a5842f;
+  --color-bronze-950: #241a0a;
+  --color-blood-400: #e05a48;
+  --color-blood-500: #d6402f;
+  --color-blood-600: #b8301f;
+  --color-blood-950: #2a0f0a;
+  --color-verdigris-350: #66bda3;
+  --color-verdigris-400: #5fb49b;
+  --color-verdigris-450: #57a98f;
+  --color-verdigris-500: #4a9e86;
+  --color-verdigris-600: #3c8270;
+  --color-verdigris-950: #0e211c;
+  --font-display: var(--font-cinzel);
+  --font-plex: var(--font-plex-sans);
+  --font-plex-mono: var(--font-plex-mono);
 }
 
 body {
@@ -80,29 +127,73 @@ body {
   background: rgba(0, 0, 0, 0.2);
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(200, 162, 75, 0.22);
   border-radius: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(200, 162, 75, 0.4);
 }
 
-/* Grid & Glass Backgrounds */
+/* Grid & Glass Backgrounds — forge look (restyles every panel across all pages) */
 .grid-bg {
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-image:
+    linear-gradient(to right, rgba(200, 162, 75, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(200, 162, 75, 0.05) 1px, transparent 1px);
   background-size: 3rem 3rem;
 }
 
 .glass-panel {
-  background: var(--card-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--card-border);
+  background: linear-gradient(180deg, rgba(26, 23, 19, 0.62), rgba(12, 10, 8, 0.5));
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(200, 162, 75, 0.12);
 }
 
 .glass-panel-glow:hover {
-  border-color: rgba(6, 182, 212, 0.2);
-  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.08);
+  border-color: rgba(200, 162, 75, 0.28);
+  box-shadow: 0 0 25px -5px rgba(200, 162, 75, 0.1);
+}
+
+/* Carved display heading helper */
+.carved {
+  font-family: var(--font-cinzel);
+  letter-spacing: 0.02em;
+}
+
+/* War map labels */
+.warmap-label {
+  position: absolute; font-family: var(--font-plex-mono); font-size: 9.5px; letter-spacing: .12em;
+  padding: 4px 8px; border: 1px solid rgba(200,162,75,.14); background: rgba(12,10,8,.72);
+  color: #b8b0a0; white-space: nowrap; pointer-events: none; transform: translate(-50%,-50%);
+  backdrop-filter: blur(3px);
+}
+.warmap-label.hot { color: var(--blood); border-color: rgba(214,64,47,.4); }
+.warmap-label.win { color: var(--verdigris); border-color: rgba(74,158,134,.4); }
+
+/* ── War-room foundation: motion primitives + reduced-motion kill-switch ──── */
+@keyframes ignite {
+  from { opacity: 0; transform: scale(0.6); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes carve-in {
+  from { opacity: 0; letter-spacing: 0.5em; filter: blur(6px); }
+  to   { opacity: 1; letter-spacing: var(--carve-tracking, 0.12em); filter: blur(0); }
+}
+@keyframes radar-sweep {
+  to { transform: rotate(360deg); }
+}
+@keyframes ember-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
+/* Any surface built on the war-room system respects reduced motion globally. */
+@media (prefers-reduced-motion: reduce) {
+  .war-room *,
+  .war-room *::before,
+  .war-room *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
