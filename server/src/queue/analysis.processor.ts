@@ -40,6 +40,86 @@ export class AnalysisProcessor {
     private readonly eventsService: EventsService,
   ) {}
 
+  async runProject(bountyId: number, targetContracts: string[], poolAddress: string): Promise<void> {
+    const primaryContract = targetContracts[0];
+    this.logger.log(`Processing project analysis for bounty ${bountyId} → [${targetContracts.join(', ')}]`);
+
+    await this.bountiesService.updateByBountyId(bountyId, { status: 'ANALYZING' });
+    await this.eventsService.log(
+      'AnalysisStarted',
+      `Ares Agent started project analysis for Bounty #${bountyId} (${targetContracts.length} contracts)`,
+    );
+
+    const fetchedAll = await Promise.all(
+      targetContracts.map((addr) => this.contractFetcherService.fetchContract(addr).then((f) => ({ addr, ...f }))),
+    );
+
+    const contracts = fetchedAll.map((f) => ({
+      address: f.addr,
+      sourceCode: f.sourceCode,
+      bytecode: f.bytecode,
+      rawSources: f.rawSources,
+    }));
+
+    const result = await this.analyzerService.analyzeProject(contracts);
+    const scannedAt = new Date();
+
+    if (result && result.vulnerabilities_found > 0) {
+      this.logger.log(`${result.vulnerabilities_found} vulnerability(s) found for project bounty ${bountyId}`);
+
+      await this.bountiesService.updateByBountyId(bountyId, {
+        status: 'VULNERABLE',
+        vulnerabilitiesFound: result.vulnerabilities_found,
+        scannedAt,
+      });
+
+      const severityRank: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1, Informational: 0 };
+      const sorted = [...result.details].sort(
+        (a, b) => (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0),
+      );
+
+      const savedFindings = await Promise.all(
+        sorted.map((v) =>
+          this.findingsService.create({
+            bountyId,
+            targetContract: primaryContract,
+            title: v.title || 'Vulnerability Found',
+            severity: v.severity || 'Medium',
+            category: v.category || 'Static Analysis',
+            description: v.description || '',
+            pocSketch: v.poc_sketch || '',
+            remediation: v.remediation || '',
+            status: 'Pending',
+          }),
+        ),
+      );
+
+      await this.eventsService.log(
+        'FindingSubmitted',
+        `Ares Agent found ${result.vulnerabilities_found} vulnerability(s) in Bounty #${bountyId} — submitting on-chain`,
+      );
+
+      const topFinding = sorted[0];
+      const pocData = toHex(topFinding?.poc_sketch || '');
+      const txHash = await this.submitterService.submitFinding(
+        poolAddress,
+        bountyId,
+        pocData,
+        topFinding?.description || 'Vulnerability detected',
+        topFinding?.severity || 'High',
+      );
+
+      await Promise.all(savedFindings.map((f) => this.findingsService.updateById(f.id, { txHash })));
+      await this.bountiesService.updateByBountyId(bountyId, { status: 'SUBMITTED' });
+    } else {
+      await this.bountiesService.updateByBountyId(bountyId, { status: 'SECURE', vulnerabilitiesFound: 0, scannedAt });
+      await this.eventsService.log(
+        'AnalysisStarted',
+        `Ares Agent found no vulnerabilities in Bounty #${bountyId} — project appears secure`,
+      );
+    }
+  }
+
   async run(job: AnalysisJob): Promise<void> {
     const { bountyId, targetContract, poolAddress } = job;
     this.logger.log(`Processing analysis for bounty ${bountyId} → ${targetContract}`);
@@ -64,6 +144,7 @@ export class AnalysisProcessor {
       targetContract,
       fetched.sourceCode,
       fetched.bytecode,
+      fetched.rawSources,
     );
 
     const scannedAt = new Date();

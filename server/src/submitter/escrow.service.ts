@@ -5,6 +5,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { mantleSepoliaTestnet } from 'viem/chains';
 import * as fs from 'fs';
 import * as path from 'path';
+import { WalletMutex } from './wallet-mutex.service';
 
 @Injectable()
 export class EscrowService {
@@ -13,7 +14,10 @@ export class EscrowService {
   private escrowAbi: any;
   private readonly ESCROW_ADDRESS: string;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private readonly walletMutex: WalletMutex,
+  ) {
     const pk = this.configService.get<string>('AGENT_PRIVATE_KEY');
     if (!pk) {
       throw new Error('AGENT_PRIVATE_KEY environment variable is not defined');
@@ -45,7 +49,7 @@ export class EscrowService {
    */
   async verifyFinding(findingId: number): Promise<string> {
     this.logger.log(`Auto-verifying finding ${findingId} on escrow ${this.ESCROW_ADDRESS}`);
-    try {
+    return this.walletMutex.run(async () => {
       const { request } = await this.client.simulateContract({
         address: this.ESCROW_ADDRESS as `0x${string}`,
         abi: this.escrowAbi,
@@ -55,15 +59,15 @@ export class EscrowService {
       const hash = await this.client.writeContract(request);
       this.logger.log(`Finding ${findingId} verified in tx: ${hash}`);
       return hash;
-    } catch (error) {
+    }).catch((error) => {
       this.logger.error(`Failed to verify finding ${findingId}`, error);
       throw error;
-    }
+    });
   }
 
   async rejectFinding(findingId: number): Promise<string> {
     this.logger.log(`Rejecting finding ${findingId} on escrow ${this.ESCROW_ADDRESS}`);
-    try {
+    return this.walletMutex.run(async () => {
       const { request } = await this.client.simulateContract({
         address: this.ESCROW_ADDRESS as `0x${string}`,
         abi: this.escrowAbi,
@@ -73,9 +77,9 @@ export class EscrowService {
       const hash = await this.client.writeContract(request);
       this.logger.log(`Finding ${findingId} rejected in tx: ${hash}`);
       return hash;
-    } catch (error) {
+    }).catch((error) => {
       this.logger.error(`Failed to reject finding ${findingId}`, error);
       throw error;
-    }
+    });
   }
 }

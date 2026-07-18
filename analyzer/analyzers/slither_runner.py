@@ -45,12 +45,10 @@ def _ensure_solc(pragma: str) -> str | None:
 
 class SlitherRunner:
     def run_analysis_on_source(self, source_code: str) -> dict:
-        """Run Slither on Solidity source and return its JSON output."""
+        """Run Slither on a single Solidity source string."""
         if not os.path.isfile(_SLITHER_BIN):
             return {"error": f"slither binary not found at {_SLITHER_BIN}"}
 
-        # solc is expected on PATH (installed via Homebrew or solc-select)
-        # solc-select is used as fallback only if the version differs
         pragma_match = re.search(r"pragma solidity\s+[^;]+;", source_code)
         if pragma_match and _SOLC_SELECT_BIN and os.path.isfile(_SOLC_SELECT_BIN):
             _ensure_solc(pragma_match.group(0))
@@ -60,11 +58,62 @@ class SlitherRunner:
             tmp_path = tmp.name
 
         try:
+            return self._run_slither(tmp_path)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    def run_analysis_on_sources(self, sources: dict, entry: str | None = None) -> dict:
+        """
+        Run Slither on a multi-file project.
+
+        sources: mapping of relative filename → Solidity source text,
+                 e.g. {"contracts/Token.sol": "...", "contracts/Vault.sol": "..."}
+        entry:   the relative filename of the entry contract (optional).
+                 If omitted, Slither is pointed at the whole temp directory.
+        """
+        if not os.path.isfile(_SLITHER_BIN):
+            return {"error": f"slither binary not found at {_SLITHER_BIN}"}
+
+        tmpdir = tempfile.mkdtemp()
+        try:
+            real_tmpdir = os.path.realpath(tmpdir)
+            entry_path = None
+            for filename, content in sources.items():
+                clean = os.path.normpath(filename.replace("\\", "/"))
+                if clean.startswith("/") or clean.startswith("..") or os.path.isabs(clean):
+                    logger.warning("Skipping suspicious source path: %s", filename)
+                    continue
+                dest = os.path.realpath(os.path.join(tmpdir, clean))
+                if not dest.startswith(real_tmpdir + os.sep):
+                    logger.warning("Path traversal blocked: %s", filename)
+                    continue
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                with open(dest, "w") as f:
+                    f.write(content)
+                if entry and filename == entry:
+                    entry_path = dest
+
+            target = entry_path or tmpdir
+
+            # Pick solc version from the entry file (or first file)
+            sample = sources.get(entry) or next(iter(sources.values()), "")
+            pragma_match = re.search(r"pragma solidity\s+[^;]+;", sample)
+            if pragma_match and _SOLC_SELECT_BIN and os.path.isfile(_SOLC_SELECT_BIN):
+                _ensure_solc(pragma_match.group(0))
+
+            return self._run_slither(target, cwd=tmpdir)
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def _run_slither(self, target: str, cwd: str | None = None) -> dict:
+        try:
             result = subprocess.run(
-                [_SLITHER_BIN, tmp_path, "--json", "-"],
+                [_SLITHER_BIN, target, "--json", "-"],
                 capture_output=True,
                 text=True,
                 timeout=120,
+                cwd=cwd,
             )
             try:
                 return json.loads(result.stdout)
@@ -76,6 +125,3 @@ class SlitherRunner:
                 }
         except subprocess.TimeoutExpired:
             return {"error": "Slither timed out"}
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)

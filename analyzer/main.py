@@ -23,6 +23,7 @@ class AnalyzeRequest(BaseModel):
     contract_address: str
     source_code: Optional[str] = None
     bytecode: Optional[str] = None
+    sources: Optional[Dict[str, str]] = None  # multi-file map from Mantlescan
 
 class AnalyzeResponse(BaseModel):
     status: str
@@ -74,7 +75,10 @@ def analyze_contract(request: AnalyzeRequest):
     # 1. Run Slither on whatever source we have
     logger.info(f"Running Slither analysis on contract {request.contract_address} ({source_type})...")
     try:
-        slither_results = slither_runner.run_analysis_on_source(source)
+        if request.sources and len(request.sources) > 1:
+            slither_results = slither_runner.run_analysis_on_sources(request.sources)
+        else:
+            slither_results = slither_runner.run_analysis_on_source(source)
         if isinstance(slither_results, dict) and "results" in slither_results:
             detectors = slither_results["results"].get("detectors", [])
             for det in detectors:
@@ -117,6 +121,80 @@ def analyze_contract(request: AnalyzeRequest):
         vulnerabilities_found=len(all_findings),
         details=all_findings,
         source_type=source_type,
+    )
+
+
+class ProjectAnalyzeRequest(BaseModel):
+    contracts: List[AnalyzeRequest]
+
+
+@app.post("/analyze-project")
+def analyze_project(request: ProjectAnalyzeRequest):
+    """
+    Analyze multiple related contracts (e.g. Router → Vault → Strategy).
+    Merges all verified source files into one temp directory and runs Slither once,
+    so cross-contract call chains are visible. LLM RAG runs on the concatenated source.
+    """
+    if not request.contracts:
+        raise HTTPException(status_code=400, detail="No contracts provided")
+
+    merged_sources: Dict[str, str] = {}
+    merged_source_text = ""
+    addresses = []
+
+    for c in request.contracts:
+        addresses.append(c.contract_address)
+        if c.sources:
+            merged_sources.update(c.sources)
+            merged_source_text += "\n\n" + "\n".join(
+                f"// File: {k}\n{v}" for k, v in c.sources.items()
+            )
+        elif c.source_code:
+            merged_source_text += f"\n\n// Contract: {c.contract_address}\n{c.source_code}"
+
+    all_findings = []
+
+    # Slither: prefer merged directory for cross-contract visibility
+    try:
+        if merged_sources:
+            slither_results = slither_runner.run_analysis_on_sources(merged_sources)
+        elif merged_source_text.strip():
+            slither_results = slither_runner.run_analysis_on_source(merged_source_text)
+        else:
+            slither_results = {}
+
+        if isinstance(slither_results, dict) and "results" in slither_results:
+            for det in slither_results["results"].get("detectors", []):
+                all_findings.append({
+                    "source": "slither",
+                    "title": det.get("check", "Slither Finding"),
+                    "severity": det.get("impact", "Medium"),
+                    "category": det.get("check", "Static Analysis"),
+                    "location": det.get("first_markdown_element", "unknown"),
+                    "description": det.get("description", ""),
+                    "poc_sketch": "N/A",
+                    "remediation": det.get("recommendation", "Review code logic"),
+                })
+    except Exception as e:
+        logger.error(f"Slither project analysis failed: {e}")
+
+    # LLM RAG on merged text
+    if llm_rag_runner and merged_source_text.strip():
+        try:
+            llm_findings = llm_rag_runner.analyze(merged_source_text)
+            if isinstance(llm_findings, list):
+                for finding in llm_findings:
+                    if isinstance(finding, dict):
+                        finding["source"] = "llm_rag"
+                        all_findings.append(finding)
+        except Exception as e:
+            logger.error(f"LLM RAG project analysis failed: {e}")
+
+    return AnalyzeResponse(
+        status="success",
+        vulnerabilities_found=len(all_findings),
+        details=all_findings,
+        source_type="verified_source" if merged_sources else "concatenated",
     )
 
 

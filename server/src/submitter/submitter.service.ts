@@ -5,6 +5,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { mantleSepoliaTestnet } from 'viem/chains';
 import * as fs from 'fs';
 import * as path from 'path';
+import { WalletMutex } from './wallet-mutex.service';
 
 @Injectable()
 export class SubmitterService {
@@ -13,7 +14,10 @@ export class SubmitterService {
   private account: any;
   private poolAbi: any;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private readonly walletMutex: WalletMutex,
+  ) {
     const pk = this.configService.get<string>('AGENT_PRIVATE_KEY');
     if (!pk) {
       throw new Error('AGENT_PRIVATE_KEY environment variable is not defined');
@@ -47,24 +51,19 @@ export class SubmitterService {
   ) {
     const severityEnum = this.severityToEnum(severity);
     this.logger.log(`Submitting finding for bounty ${bountyId} on pool ${poolAddress} [severity=${severity}/${severityEnum}]`);
-    try {
+    return this.walletMutex.run(async () => {
       const { request } = await this.client.simulateContract({
         address: poolAddress as `0x${string}`,
         abi: this.poolAbi,
         functionName: 'submitFinding',
-        args: [
-          BigInt(bountyId),
-          pocData as `0x${string}`,
-          description,
-          severityEnum,
-        ],
+        args: [BigInt(bountyId), pocData as `0x${string}`, description, severityEnum],
       });
       const hash = await this.client.writeContract(request);
       this.logger.log(`Finding submitted in tx: ${hash}`);
       return hash;
-    } catch (error) {
+    }).catch((error) => {
       this.logger.error('Failed to submit finding', error);
       throw error;
-    }
+    });
   }
 }

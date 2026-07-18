@@ -1,9 +1,12 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { createPublicClient, http, parseEther, getAddress } from 'viem';
 import { mantleSepoliaTestnet } from 'viem/chains';
 import { ContractFetcherService } from '../blockchain/contract-fetcher.service';
 import { AnalyzerService } from '../analyzer/analyzer.service';
+import { UsedTxHashEntity } from '../database/entities/used-tx-hash.entity';
 
 // Minimum payment: 2 MNT (Mantle native token)
 const MIN_PAYMENT = parseEther('2');
@@ -30,9 +33,10 @@ export class AuditService {
   private readonly logger = new Logger(AuditService.name);
   private readonly client: ReturnType<typeof createPublicClient>;
   private readonly paymentAddress: `0x${string}`;
-  private readonly usedTxHashes = new Set<string>();
 
   constructor(
+    @InjectRepository(UsedTxHashEntity)
+    private readonly usedTxHashRepo: Repository<UsedTxHashEntity>,
     private readonly configService: ConfigService,
     private readonly contractFetcherService: ContractFetcherService,
     private readonly analyzerService: AnalyzerService,
@@ -53,7 +57,7 @@ export class AuditService {
       throw new BadRequestException('txHash must be a valid 0x transaction hash (64 hex chars)');
     }
 
-    if (this.usedTxHashes.has(txHash)) {
+    if (await this.usedTxHashRepo.existsBy({ txHash })) {
       throw new BadRequestException('This transaction has already been used for an audit');
     }
 
@@ -80,8 +84,7 @@ export class AuditService {
       );
     }
 
-    // Mark as used to prevent replay
-    this.usedTxHashes.add(txHash);
+    await this.usedTxHashRepo.save({ txHash });
   }
 
   async runAudit(contractAddress: string): Promise<AuditReport> {
@@ -103,12 +106,38 @@ export class AuditService {
       contractAddress,
       fetched.sourceCode,
       fetched.bytecode,
+      fetched.rawSources,
     );
 
     return {
       contractAddress,
       isVerified: fetched.isVerified,
       contractName: fetched.contractName,
+      vulnerabilities_found: result?.vulnerabilities_found ?? 0,
+      details: result?.details ?? [],
+      analyzedAt: new Date().toISOString(),
+    };
+  }
+
+  async runProjectAudit(addresses: string[]): Promise<AuditReport> {
+    this.logger.log(`Running project audit for ${addresses.length} contracts`);
+
+    const fetched = await Promise.all(
+      addresses.map((addr) => this.contractFetcherService.fetchContract(addr).then((f) => ({ addr, ...f }))),
+    );
+
+    const contracts = fetched.map((f) => ({
+      address: f.addr,
+      sourceCode: f.sourceCode,
+      bytecode: f.bytecode,
+      rawSources: f.rawSources,
+    }));
+
+    const result = await this.analyzerService.analyzeProject(contracts);
+
+    return {
+      contractAddress: addresses[0],
+      isVerified: fetched.some((f) => f.isVerified),
       vulnerabilities_found: result?.vulnerabilities_found ?? 0,
       details: result?.details ?? [],
       analyzedAt: new Date().toISOString(),

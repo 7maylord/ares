@@ -23,6 +23,7 @@ export class AnalyzerService {
     contractAddress: string,
     sourceCode?: string,
     bytecode?: string,
+    rawSources?: Record<string, string>,
   ): Promise<any> {
     this.logger.log(`Sending contract ${contractAddress} to Python Analyzer...`);
     try {
@@ -31,11 +32,32 @@ export class AnalyzerService {
           contract_address: contractAddress,
           source_code: sourceCode || null,
           bytecode: bytecode || null,
+          sources: rawSources || null,
         }),
       );
       return response.data;
     } catch (error) {
       this.logger.error(`Analysis failed for ${contractAddress}`, error);
+      return null;
+    }
+  }
+
+  async analyzeProject(contracts: { address: string; sourceCode?: string; bytecode?: string; rawSources?: Record<string, string> }[]): Promise<any> {
+    this.logger.log(`Sending ${contracts.length}-contract project to Python Analyzer...`);
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(`${this.analyzerUrl}/analyze-project`, {
+          contracts: contracts.map((c) => ({
+            address: c.address,
+            source_code: c.sourceCode || null,
+            bytecode: c.bytecode || null,
+            sources: c.rawSources || null,
+          })),
+        }),
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.error('Project analysis failed', error);
       return null;
     }
   }

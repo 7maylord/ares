@@ -318,6 +318,18 @@ The user-facing interface at [ares-x.vercel.app](https://ares-x.vercel.app). Bui
 | BountyPool | [`0x9Bc25B223787Ce045e8B5C19A2547B3b1eBDA1D8`](https://sepolia.mantlescan.xyz/address/0x9Bc25B223787Ce045e8B5C19A2547B3b1eBDA1D8) |
 | BountyEscrow | [`0x084D072416984F89d9dfF6548A357C88aE7A39Fe`](https://sepolia.mantlescan.xyz/address/0x084D072416984F89d9dfF6548A357C88aE7A39Fe) |
 
+## ERC-8004 Agent Identity (Mantle Mainnet)
+
+Ares is registered as an on-chain agent in the [ERC-8004 Identity Registry](https://eips.ethereum.org/EIPS/eip-8004) on Mantle mainnet.
+
+| Field | Value |
+|-------|-------|
+| Registry | [`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`](https://mantlescan.xyz/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432) |
+| Agent NFT ID | `129` |
+| Agent Wallet | `0xAD6433f3a49eb065e6470F231a3dc3Dee26F0f9d` |
+| Agent URI | `ipfs://bafkreifwsup3m6w27bl3firzn2ofk7pbhfkl6vxd6vaqgbz3sv7kzmdf3e` |
+| Registration Tx | [`0xa4a0e6fccf45ecb60eb6db63daba9a5607762e97c66739e8ac880b8b2a658763`](https://mantlescan.xyz/tx/0xa4a0e6fccf45ecb60eb6db63daba9a5607762e97c66739e8ac880b8b2a658763) |
+
 ---
 
 ## Getting Started Locally

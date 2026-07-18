@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { AresMark } from "../components/AresMark";
 import { useRouter } from "next/navigation";
 import { useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain } from "wagmi";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
@@ -182,18 +182,30 @@ export default function Dashboard() {
   const [triggerContract, setTriggerContract] = useState("");
   const [isTriggering, setIsTriggering] = useState(false);
   const [triggerDone, setTriggerDone] = useState(false);
+  const [multiMode, setMultiMode] = useState(false);
+  const [extraAddresses, setExtraAddresses] = useState("");
 
   async function runManualAnalysis() {
     if (!triggerContract.startsWith("0x")) return;
     setIsTriggering(true);
     setTriggerDone(false);
     try {
-      await fetch(`${API_URL}/analysis/trigger`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetContract: triggerContract }),
-      });
+      if (multiMode) {
+        const extras = extraAddresses.split("\n").map((s) => s.trim()).filter((s) => s.startsWith("0x"));
+        await fetch(`${API_URL}/analysis/trigger-multi`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetContracts: [triggerContract, ...extras] }),
+        });
+      } else {
+        await fetch(`${API_URL}/analysis/trigger`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetContract: triggerContract }),
+        });
+      }
       setTriggerContract("");
+      setExtraAddresses("");
       setTriggerDone(true);
       setTimeout(fetchAll, 2000);
     } finally {
@@ -213,10 +225,10 @@ export default function Dashboard() {
 
   const statusBadge = (status: string) => {
     const map: Record<string, string> = {
-      VERIFIED:   "bg-emerald-500/10 text-emerald-400 border-emerald-500/25",
-      SECURE:     "bg-cyan-500/10 text-cyan-400 border-cyan-500/25",
-      ANALYZING:  "bg-purple-500/10 text-purple-400 border-purple-500/25",
-      VULNERABLE: "bg-rose-500/10 text-rose-400 border-rose-500/25",
+      VERIFIED:   "bg-verdigris-500/10 text-verdigris-400 border-verdigris-500/25",
+      SECURE:     "bg-bronze-500/10 text-bronze-400 border-bronze-500/25",
+      ANALYZING:  "bg-bronze-500/10 text-bronze-400 border-bronze-500/25",
+      VULNERABLE: "bg-blood-500/10 text-blood-400 border-blood-500/25",
       SUBMITTED:  "bg-amber-500/10 text-amber-400 border-amber-500/25",
       PENDING:    "bg-zinc-800 text-zinc-400 border-zinc-700",
     };
@@ -225,27 +237,27 @@ export default function Dashboard() {
 
   const eventBadge = (type: string) => {
     const map: Record<string, string> = {
-      BountyCreated:      "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-      FindingSubmitted:   "bg-purple-500/10 text-purple-400 border-purple-500/20",
-      VerificationPassed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-      VerificationFailed: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+      BountyCreated:      "bg-bronze-500/10 text-bronze-400 border-bronze-500/20",
+      FindingSubmitted:   "bg-bronze-500/10 text-bronze-400 border-bronze-500/20",
+      VerificationPassed: "bg-verdigris-500/10 text-verdigris-400 border-verdigris-500/20",
+      VerificationFailed: "bg-blood-500/10 text-blood-400 border-blood-500/20",
       AnalysisStarted:    "bg-zinc-800 text-zinc-400 border-zinc-700",
     };
     return `px-2 py-0.5 rounded text-[9px] font-mono font-bold border ${map[type] ?? map.AnalysisStarted}`;
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans flex flex-col selection:bg-cyan-500 selection:text-black overflow-x-hidden relative">
+    <div className="min-h-screen bg-ash text-bone font-plex flex flex-col selection:bg-bronze-500 selection:text-black overflow-x-hidden relative">
       
       {/* Background Gradients & Grid */}
       <div className="absolute inset-0 grid-bg pointer-events-none opacity-20 z-0" />
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-cyan-500/5 rounded-full blur-[140px] pointer-events-none animate-pulse-glow z-0" />
-      <div className="absolute bottom-[20%] right-[-10%] w-[60%] h-[60%] bg-purple-500/5 rounded-full blur-[160px] pointer-events-none animate-pulse-glow z-0" />
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-bronze-500/5 rounded-full blur-[140px] pointer-events-none animate-pulse-glow z-0" />
+      <div className="absolute bottom-[20%] right-[-10%] w-[60%] h-[60%] bg-bronze-500/5 rounded-full blur-[160px] pointer-events-none animate-pulse-glow z-0" />
 
       <div className="relative z-10 flex flex-col grow">
         {/* Error notification header */}
         {error && (
-          <div className="bg-rose-950/40 border-b border-rose-800/40 text-rose-300 text-xs py-2 px-6 font-mono text-center relative z-50">
+          <div className="bg-blood-950/40 border-b border-blood-800/40 text-blood-300 text-xs py-2 px-6 font-mono text-center relative z-50">
             {error}
           </div>
         )}
@@ -265,13 +277,13 @@ export default function Dashboard() {
         )}
 
         {/* Header */}
-        <header className="border-b border-zinc-900 bg-zinc-950/70 backdrop-blur-xl sticky top-0 z-40">
+        <header className="border-b border-zinc-900 bg-ash/70 backdrop-blur-xl sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <Link href="/" className="flex items-center gap-3">
-              <Image src="/logo.png" alt="Ares Logo" width={40} height={40} className="rounded-xl object-cover shadow-lg shadow-cyan-500/20" />
+              <AresMark className="h-10 w-10 drop-shadow-[0_0_12px_rgba(200,162,75,0.25)]" />
               <div>
-                <span className="text-xl font-bold tracking-tight bg-linear-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">ARES</span>
-                <span className="text-[10px] block text-zinc-500 font-mono tracking-widest uppercase">Bug Bounty Hunter</span>
+                <span className="carved font-extrabold text-xl tracking-[0.3em] text-bone block">ARES</span>
+                <span className="text-[10px] block text-bronze-deep font-mono tracking-widest uppercase">Bug Bounty Hunter</span>
               </div>
             </Link>
 
@@ -279,7 +291,7 @@ export default function Dashboard() {
               <div className="hidden md:flex items-center gap-2 bg-zinc-900/80 px-3.5 py-1.5 rounded-lg border border-zinc-800 text-xs">
                 {loading
                   ? <><span className="h-2 w-2 rounded-full bg-zinc-650 animate-pulse" /><span className="text-zinc-500 font-mono">Connecting...</span></>
-                  : <><span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" /><span className="text-zinc-400 font-mono">Mantle Testnet · Live</span></>
+                  : <><span className="h-2 w-2 rounded-full bg-verdigris-500 animate-pulse shadow-[0_0_8px_#4a9e86]" /><span className="text-zinc-400 font-mono">Mantle Testnet · Live</span></>
                 }
               </div>
               <button
@@ -290,7 +302,7 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={() => setShowCreate(true)}
-                className="text-xs px-4 py-2 rounded-lg font-semibold bg-linear-to-r from-cyan-500 to-purple-600 text-white hover:from-cyan-400 hover:to-purple-500 transition-all shadow-lg shadow-cyan-500/10 cursor-pointer"
+                className="text-xs px-4 py-2 rounded-lg font-semibold bg-linear-to-r from-bronze-500 to-bronze-600 text-ash hover:from-bronze-400 hover:to-bronze-500 transition-all shadow-lg shadow-bronze-500/10 cursor-pointer"
               >
                 + Create Bounty
               </button>
@@ -303,16 +315,16 @@ export default function Dashboard() {
           
           {/* Stats Bar Overhaul */}
           <section className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="glass-panel p-5 rounded-2xl flex flex-col gap-1 relative overflow-hidden group hover:border-cyan-500/20 transition-all">
-              <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-cyan-500/10 transition-all" />
+            <div className="glass-panel p-5 rounded-2xl flex flex-col gap-1 relative overflow-hidden group hover:border-bronze-500/20 transition-all">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-bronze-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-bronze-500/10 transition-all" />
               <span className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider">Total Pool Locked</span>
-              <span className="text-2xl font-bold text-cyan-400 font-mono">{totalBountyVolume} MNT</span>
+              <span className="text-2xl font-bold text-bronze-400 font-mono">{totalBountyVolume} MNT</span>
               <span className="text-[10px] text-zinc-550 mt-1">Across active escrows</span>
             </div>
-            <div className="glass-panel p-5 rounded-2xl flex flex-col gap-1 relative overflow-hidden group hover:border-emerald-500/20 transition-all">
-              <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/10 transition-all" />
+            <div className="glass-panel p-5 rounded-2xl flex flex-col gap-1 relative overflow-hidden group hover:border-verdigris-500/20 transition-all">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-verdigris-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-verdigris-500/10 transition-all" />
               <span className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider">Payouts Disbursed</span>
-              <span className="text-2xl font-bold text-emerald-400 font-mono">{totalPayouts} MNT</span>
+              <span className="text-2xl font-bold text-verdigris-400 font-mono">{totalPayouts} MNT</span>
               <span className="text-[10px] text-zinc-550 mt-1">{agentStats?.successful ?? 0} verified finding(s)</span>
             </div>
             <div className="glass-panel p-5 rounded-2xl flex flex-col gap-1 relative overflow-hidden group hover:border-zinc-700 transition-all">
@@ -321,19 +333,19 @@ export default function Dashboard() {
               <span className="text-2xl font-bold text-zinc-100 font-mono">{bounties.length}</span>
               <span className="text-[10px] text-zinc-550 mt-1">{bounties.filter((b) => b.active).length} active escrows</span>
             </div>
-            <div className="glass-panel p-5 rounded-2xl flex flex-col gap-1 relative overflow-hidden group hover:border-rose-500/20 transition-all">
-              <div className="absolute top-0 right-0 w-16 h-16 bg-rose-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-rose-500/10 transition-all" />
+            <div className="glass-panel p-5 rounded-2xl flex flex-col gap-1 relative overflow-hidden group hover:border-blood-500/20 transition-all">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-blood-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-blood-500/10 transition-all" />
               <span className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider">Vulnerabilities</span>
-              <span className="text-2xl font-bold text-rose-400 font-mono">{findings.length}</span>
+              <span className="text-2xl font-bold text-blood-400 font-mono">{findings.length}</span>
               <span className="text-[10px] text-zinc-550 mt-1">{findings.filter((f) => f.status === "Verified").length} verified</span>
             </div>
-            <div className="glass-panel p-5 rounded-2xl flex flex-col gap-1 col-span-2 lg:col-span-1 relative overflow-hidden group hover:border-purple-500/20 transition-all">
-              <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/10 transition-all" />
+            <div className="glass-panel p-5 rounded-2xl flex flex-col gap-1 col-span-2 lg:col-span-1 relative overflow-hidden group hover:border-bronze-500/20 transition-all">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-bronze-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-bronze-500/10 transition-all" />
               <span className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider">Agent Reputation</span>
-              <span className="text-2xl font-bold text-purple-400 font-mono">
+              <span className="text-2xl font-bold text-bronze-400 font-mono">
                 {agentStats?.reputationScore ?? "—"} REP
               </span>
-              <span className="text-[10px] text-purple-350/80 font-mono truncate block">{agentStats?.address ? `${agentStats.address.slice(0,10)}...` : "Ares Agent"}</span>
+              <span className="text-[10px] text-bronze-350/80 font-mono truncate block">{agentStats?.address ? `${agentStats.address.slice(0,10)}...` : "Ares Agent"}</span>
             </div>
           </section>
 
@@ -342,11 +354,10 @@ export default function Dashboard() {
             <nav className="flex gap-6 relative z-10">
               {(["overview", "bounties", "findings", "leaderboard"] as const).map((tab) => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
+                  key={tab}                  onClick={() => setActiveTab(tab)}
                   className={`pb-4 px-1 text-sm font-semibold border-b-2 transition-all cursor-pointer relative ${
                     activeTab === tab
-                      ? "border-cyan-400 text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.3)]"
+                      ? "border-bronze-400 text-bronze-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.3)]"
                       : "border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-800"
                   }`}
                 >
@@ -362,10 +373,10 @@ export default function Dashboard() {
               <div className="lg:col-span-2 flex flex-col gap-6">
 
                 {/* Run Ares panel */}
-                <div className="glass-panel rounded-2xl p-6 hover:border-purple-500/20 transition-all duration-300">
+                <div className="glass-panel rounded-2xl p-6 hover:border-bronze-500/20 transition-all duration-300">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="h-9 w-9 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                      <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="h-9 w-9 rounded-lg bg-bronze-500/10 border border-bronze-500/20 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-bronze-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -375,24 +386,47 @@ export default function Dashboard() {
                       <p className="text-xs text-zinc-500">Manually target any contract for immediate analysis — no bounty required</p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <button
+                      onClick={() => { setMultiMode(false); setExtraAddresses(""); setTriggerDone(false); }}
+                      className={`text-xs px-3 py-1 rounded-lg font-mono transition-all cursor-pointer ${!multiMode ? "bg-bronze-600 text-ash" : "bg-zinc-900 text-zinc-500 hover:text-zinc-300"}`}
+                    >
+                      Single contract
+                    </button>
+                    <button
+                      onClick={() => { setMultiMode(true); setTriggerDone(false); }}
+                      className={`text-xs px-3 py-1 rounded-lg font-mono transition-all cursor-pointer ${multiMode ? "bg-bronze-600 text-ash" : "bg-zinc-900 text-zinc-500 hover:text-zinc-300"}`}
+                    >
+                      Multi-contract
+                    </button>
+                  </div>
                   <div className="flex gap-3">
                     <input
                       type="text"
-                      placeholder="0x contract address..."
+                      placeholder={multiMode ? "0x entry contract (Router / main)..." : "0x contract address..."}
                       value={triggerContract}
                       onChange={(e) => { setTriggerContract(e.target.value); setTriggerDone(false); }}
-                      className="grow bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-mono text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-purple-500/60 focus:ring-1 focus:ring-purple-500/20 transition-all"
+                      className="grow bg-ash/80 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-mono text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-bronze-500/60 focus:ring-1 focus:ring-bronze-500/20 transition-all"
                     />
                     <button
                       onClick={runManualAnalysis}
                       disabled={isTriggering || !triggerContract.startsWith("0x")}
-                      className="px-5 py-2.5 rounded-xl font-bold text-sm bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 cursor-pointer"
+                      className="px-5 py-2.5 rounded-xl font-bold text-sm bg-bronze-600 text-ash hover:bg-bronze-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 cursor-pointer"
                     >
                       {isTriggering ? "Running..." : "▶ Run"}
                     </button>
                   </div>
+                  {multiMode && (
+                    <textarea
+                      placeholder={"Additional contracts (one 0x address per line):\n0x Vault...\n0x Strategy..."}
+                      value={extraAddresses}
+                      onChange={(e) => { setExtraAddresses(e.target.value); setTriggerDone(false); }}
+                      rows={3}
+                      className="mt-2 w-full bg-ash/80 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-mono text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-bronze-500/60 focus:ring-1 focus:ring-bronze-500/20 transition-all resize-none"
+                    />
+                  )}
                   {triggerDone && (
-                    <p className="mt-2 text-xs text-emerald-450 font-mono">
+                    <p className="mt-2 text-xs text-verdigris-450 font-mono">
                       ✓ Analysis queued — results will appear in the feed below as they complete.
                     </p>
                   )}
@@ -409,7 +443,7 @@ export default function Dashboard() {
                   ) : bounties.length === 0 ? (
                     <div className="py-12 text-center text-zinc-550 text-sm">
                       No bounties found.{" "}
-                      <button onClick={() => setShowCreate(true)} className="text-cyan-400 hover:underline font-semibold cursor-pointer">
+                      <button onClick={() => setShowCreate(true)} className="text-bronze-400 hover:underline font-semibold cursor-pointer">
                         Create escrow
                       </button>{" "}
                       or submit manual target above.
@@ -430,11 +464,11 @@ export default function Dashboard() {
                             <div className="mt-1.5 text-[11px] text-zinc-500 flex flex-wrap gap-x-4 gap-y-1 font-mono">
                               {bounty.creator && <span>Creator: {bounty.creator.substring(0, 8)}...{bounty.creator.substring(36)}</span>}
                               {bounty.deadline && <span className="text-zinc-600">Deadline: {bounty.deadline}</span>}
-                              {bounty.scannedAt && <span className="text-purple-400/80">Scanned: {new Date(bounty.scannedAt).toLocaleTimeString()}</span>}
+                              {bounty.scannedAt && <span className="text-bronze-400/80">Scanned: {new Date(bounty.scannedAt).toLocaleTimeString()}</span>}
                             </div>
                           </div>
                           <div className="shrink-0 text-right flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-start gap-2 sm:gap-0">
-                            <span className="text-base font-extrabold text-cyan-300 font-mono">{bounty.rewardAmount} MNT</span>
+                            <span className="text-base font-extrabold text-bronze-300 font-mono">{bounty.rewardAmount} MNT</span>
                             <span className="text-[10px] text-zinc-550 font-mono uppercase block">Min: {bounty.severityThreshold}</span>
                           </div>
                         </div>
@@ -447,7 +481,7 @@ export default function Dashboard() {
               {/* Live Activity Feed sidebar */}
               <div className="glass-panel rounded-2xl p-6 flex flex-col h-full min-h-[460px]">
                 <h2 className="text-base font-bold text-zinc-150 mb-5 flex items-center gap-2 shrink-0">
-                  <svg className="w-4 h-4 text-cyan-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-bronze-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   Live Activity Feed
@@ -461,7 +495,7 @@ export default function Dashboard() {
                 ) : (
                   <div className="grow overflow-y-auto space-y-3 pr-1.5 text-[11px] custom-scrollbar h-0 min-h-0">
                     {logs.map((log) => (
-                      <div key={log.id} className="p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl flex flex-col gap-1.5 hover:border-zinc-800 transition-all">
+                      <div key={log.id} className="p-3 bg-ash/40 border border-zinc-900 rounded-xl flex flex-col gap-1.5 hover:border-zinc-800 transition-all">
                         <div className="flex items-center justify-between">
                           <span className={eventBadge(log.type)}>{log.type}</span>
                           <span className="text-[9px] text-zinc-650 font-mono">
@@ -484,10 +518,10 @@ export default function Dashboard() {
           {activeTab === "bounties" && (
             <div className="glass-panel rounded-2xl p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold text-zinc-100">Bounty Escrows Register</h2>
+                <h2 className="carved uppercase tracking-wide text-lg font-bold text-bone">Bounty Escrows Register</h2>
                 <button
                   onClick={() => setShowCreate(true)}
-                  className="text-xs px-4 py-2 rounded-lg font-semibold bg-linear-to-r from-cyan-500 to-purple-600 text-white hover:from-cyan-400 hover:to-purple-500 transition-all cursor-pointer"
+                  className="text-xs px-4 py-2 rounded-lg font-semibold bg-linear-to-r from-bronze-500 to-bronze-600 text-ash hover:from-bronze-400 hover:to-bronze-500 transition-all cursor-pointer"
                 >
                   + Create Bounty
                 </button>
@@ -514,7 +548,7 @@ export default function Dashboard() {
                           <td className="py-4 px-4 text-zinc-450">#{b.bountyId}</td>
                           <td className="py-4 px-4 text-zinc-200">{b.targetContract}</td>
                           <td className="py-4 px-4 text-zinc-500">{b.creator?.substring(0, 12)}...{b.creator?.substring(32)}</td>
-                          <td className="py-4 px-4 font-extrabold text-cyan-300">{b.rewardAmount} MNT</td>
+                          <td className="py-4 px-4 font-extrabold text-bronze-300">{b.rewardAmount} MNT</td>
                           <td className="py-4 px-4 text-zinc-400">{b.severityThreshold}</td>
                           <td className="py-4 px-4 text-zinc-450">{b.deadline}</td>
                           <td className="py-4 px-4"><span className={statusBadge(b.status)}>{b.status}</span></td>
@@ -530,7 +564,7 @@ export default function Dashboard() {
           {/* Findings Tab */}
           {activeTab === "findings" && (
             <div className="space-y-6">
-              <h2 className="text-lg font-bold text-zinc-100">Agent Vulnerability Findings</h2>
+              <h2 className="carved uppercase tracking-wide text-lg font-bold text-bone">Agent Vulnerability Findings</h2>
               {findings.length === 0 ? (
                 <div className="glass-panel rounded-2xl p-12 text-center text-zinc-550">
                   No automated findings generated. Active vulnerabilities appear here once processed by Ares.
@@ -560,9 +594,9 @@ export default function Dashboard() {
                           router.push(`/findings/${top.targetContract}`);
                         }}
                         className={`glass-panel rounded-2xl p-5 flex flex-col gap-3 relative overflow-hidden transition-all duration-200 cursor-pointer group
-                          ${isCritical ? "border-rose-500/25 hover:border-rose-500/50" : isHigh ? "border-orange-500/25 hover:border-orange-500/50" : "border-amber-500/20 hover:border-amber-500/40"}`}
+                          ${isCritical ? "border-blood-500/25 hover:border-blood-500/50" : isHigh ? "border-orange-500/25 hover:border-orange-500/50" : "border-amber-500/20 hover:border-amber-500/40"}`}
                       >
-                        <div className={`absolute top-0 left-0 bottom-0 w-1 ${isCritical ? "bg-rose-500" : isHigh ? "bg-orange-500" : "bg-amber-500"}`} />
+                        <div className={`absolute top-0 left-0 bottom-0 w-1 ${isCritical ? "bg-blood-500" : isHigh ? "bg-orange-500" : "bg-amber-500"}`} />
 
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
@@ -572,15 +606,15 @@ export default function Dashboard() {
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border
-                                ${isCritical ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                ${isCritical ? "bg-blood-500/10 text-blood-400 border-blood-500/20"
                                 : isHigh ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
                                 : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>
                                 {top.severity}
                               </span>
                               <span className={`text-[10px] px-2 py-0.5 rounded font-bold font-mono border
-                                ${isVerified ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                ${isVerified ? "bg-verdigris-500/10 text-verdigris-400 border-verdigris-500/20"
                                 : isPending ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse"
-                                : "bg-rose-500/10 text-rose-400 border-rose-500/20"}`}>
+                                : "bg-blood-500/10 text-blood-400 border-blood-500/20"}`}>
                                 {isVerified ? "Verified" : isPending ? "Pending" : "Rejected"}
                               </span>
                               <span className="text-[10px] text-zinc-500 font-mono">
@@ -596,7 +630,7 @@ export default function Dashboard() {
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="text-emerald-400 font-mono text-[10px] hover:underline flex items-center gap-1"
+                                className="text-verdigris-400 font-mono text-[10px] hover:underline flex items-center gap-1"
                               >
                                 Payout {payoutTx.slice(0, 8)}...
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
@@ -608,7 +642,7 @@ export default function Dashboard() {
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="text-cyan-400 font-mono text-[10px] hover:underline flex items-center gap-1"
+                                className="text-bronze-400 font-mono text-[10px] hover:underline flex items-center gap-1"
                               >
                                 Submission {submissionTx.slice(0, 8)}...
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
@@ -639,7 +673,7 @@ export default function Dashboard() {
           {/* Reputation Ledger Tab */}
           {activeTab === "leaderboard" && (
             <div className="glass-panel rounded-2xl p-6">
-              <h2 className="text-lg font-bold text-zinc-100 mb-4">Registered Agents Reputation Ledger</h2>
+              <h2 className="carved uppercase tracking-wide text-lg font-bold text-bone mb-4">Registered Agents Reputation Ledger</h2>
               <div className="overflow-x-auto custom-scrollbar">
                 <table className="w-full text-left text-sm text-zinc-300 border-collapse">
                   <thead>
@@ -655,12 +689,12 @@ export default function Dashboard() {
                   <tbody className="divide-y divide-zinc-900">
                     {agentStats ? (
                       <tr className="hover:bg-zinc-900/10 font-mono text-xs">
-                        <td className="py-4 px-4 font-bold text-cyan-400">#1</td>
+                        <td className="py-4 px-4 font-bold text-bronze-400">#1</td>
                         <td className="py-4 px-4 text-zinc-200 text-xs">{agentStats.address}</td>
-                        <td className="py-4 px-4 font-extrabold text-purple-400">{agentStats.reputationScore} REP</td>
+                        <td className="py-4 px-4 font-extrabold text-bronze-400">{agentStats.reputationScore} REP</td>
                         <td className="py-4 px-4 text-zinc-400">{agentStats.reputationScore >= 800 ? "Elite Swarm" : agentStats.reputationScore >= 500 ? "Tier 1 Auditor" : "Novice Node"}</td>
-                        <td className="py-4 px-4 font-bold text-emerald-450">{agentStats.successful}</td>
-                        <td className="py-4 px-4 text-rose-500">{agentStats.failed}</td>
+                        <td className="py-4 px-4 font-bold text-verdigris-450">{agentStats.successful}</td>
+                        <td className="py-4 px-4 text-blood-500">{agentStats.failed}</td>
                       </tr>
                     ) : (
                       <tr><td colSpan={6} className="py-8 text-center text-zinc-500 font-mono text-xs animate-pulse">Loading active agent registry records...</td></tr>
@@ -674,7 +708,7 @@ export default function Dashboard() {
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-zinc-900 bg-zinc-950/60 py-8 mt-auto">
+        <footer className="border-t border-zinc-900 bg-ash/60 py-8 mt-auto">
           <div className="max-w-7xl mx-auto px-4 text-center text-xs text-zinc-500 font-mono">
             <span>© 2026 Ares Protocol · </span>
             <Link href="/" className="hover:text-zinc-300 transition-colors">← Back to Homepage</Link>
@@ -690,13 +724,13 @@ export default function Dashboard() {
         >
           <div className="glass-panel rounded-3xl w-full max-w-lg shadow-2xl relative overflow-hidden">
             {/* Modal Ambient Lights */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-bronze-500/5 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-bronze-500/5 rounded-full blur-2xl pointer-events-none" />
 
             <div className="relative z-10">
               <div className="flex items-center justify-between p-6 border-b border-zinc-900">
                 <div>
-                  <h2 className="text-base font-bold text-zinc-100">Create Bounty Escrow</h2>
+                  <h2 className="carved uppercase tracking-wide text-base font-bold text-bone">Create Bounty Escrow</h2>
                   <p className="text-xs text-zinc-500 mt-0.5">Deploy rewards on Mantle Sepolia to dispatch the auditing swarm.</p>
                 </div>
                 <button
@@ -718,7 +752,7 @@ export default function Dashboard() {
                     placeholder="0x..."
                     value={createForm.targetContract}
                     onChange={(e) => setCreateForm((f) => ({ ...f, targetContract: e.target.value }))}
-                    className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4.5 py-3 text-sm font-mono text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                    className="w-full bg-ash/80 border border-zinc-800 rounded-xl px-4.5 py-3 text-sm font-mono text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-bronze-500/60 focus:ring-1 focus:ring-bronze-500/20 transition-all"
                   />
                 </div>
 
@@ -732,7 +766,7 @@ export default function Dashboard() {
                       step="0.1"
                       value={createForm.rewardMnt}
                       onChange={(e) => setCreateForm((f) => ({ ...f, rewardMnt: e.target.value }))}
-                      className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4.5 py-3 text-sm font-mono text-zinc-200 focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                      className="w-full bg-ash/80 border border-zinc-800 rounded-xl px-4.5 py-3 text-sm font-mono text-zinc-200 focus:outline-none focus:border-bronze-500/60 focus:ring-1 focus:ring-bronze-500/20 transition-all"
                     />
                   </div>
 
@@ -743,7 +777,7 @@ export default function Dashboard() {
                       <select
                         value={createForm.severity}
                         onChange={(e) => setCreateForm((f) => ({ ...f, severity: e.target.value }))}
-                        className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4.5 py-3 text-sm text-zinc-250 focus:outline-none focus:border-cyan-500/60 transition-all appearance-none cursor-pointer"
+                        className="w-full bg-ash/80 border border-zinc-800 rounded-xl px-4.5 py-3 text-sm text-zinc-250 focus:outline-none focus:border-bronze-500/60 transition-all appearance-none cursor-pointer"
                       >
                         {SEVERITY_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value}>{o.label}</option>
@@ -766,25 +800,25 @@ export default function Dashboard() {
                     min="1"
                     value={createForm.deadlineDays}
                     onChange={(e) => setCreateForm((f) => ({ ...f, deadlineDays: e.target.value }))}
-                    className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4.5 py-3 text-sm font-mono text-zinc-200 focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                    className="w-full bg-ash/80 border border-zinc-800 rounded-xl px-4.5 py-3 text-sm font-mono text-zinc-200 focus:outline-none focus:border-bronze-500/60 focus:ring-1 focus:ring-bronze-500/20 transition-all"
                   />
                 </div>
 
                 {/* Create Error */}
                 {createError && (
-                  <p className="text-xs text-rose-400 font-mono bg-rose-950/20 border border-rose-900/40 rounded-xl p-3">
+                  <p className="text-xs text-blood-400 font-mono bg-blood-950/20 border border-blood-900/40 rounded-xl p-3">
                     {createError.message?.split("\n")[0] ?? "Transaction rejected by client"}
                   </p>
                 )}
 
                 {/* Transaction receipt link status */}
                 {createHash && (
-                  <div className="text-xs text-emerald-450 font-mono bg-emerald-950/20 border border-emerald-900/30 rounded-xl p-4 space-y-2">
+                  <div className="text-xs text-verdigris-450 font-mono bg-verdigris-950/20 border border-verdigris-900/30 rounded-xl p-4 space-y-2">
                     <div className="flex items-center gap-2">
                       {isConfirming ? (
                         <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
                       ) : (
-                        <span className="h-2 w-2 rounded-full bg-emerald-450" />
+                        <span className="h-2 w-2 rounded-full bg-verdigris-450" />
                       )}
                       <span>{isConfirming ? "Waiting for receipt confirmation..." : "✓ Bounty Vault deployed!"}</span>
                     </div>
@@ -792,7 +826,7 @@ export default function Dashboard() {
                       href={`https://sepolia.mantlescan.xyz/tx/${createHash}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="block text-cyan-400 hover:text-cyan-300 hover:underline truncate"
+                      className="block text-bronze-400 hover:text-bronze-300 hover:underline truncate"
                     >
                       Explorer: {createHash}
                     </a>
@@ -803,7 +837,7 @@ export default function Dashboard() {
                 {isCreateSuccess ? (
                   <button
                     onClick={closeCreateModal}
-                    className="w-full py-3 rounded-xl font-bold text-sm bg-emerald-600 text-white hover:bg-emerald-500 transition-all cursor-pointer"
+                    className="w-full py-3 rounded-xl font-bold text-sm bg-verdigris-600 text-bone hover:bg-verdigris-500 transition-all cursor-pointer"
                   >
                     Done
                   </button>
@@ -818,7 +852,7 @@ export default function Dashboard() {
                   <button
                     onClick={() => switchChain({ chainId: MANTLE_SEPOLIA_ID })}
                     disabled={isSwitching}
-                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50 transition-all cursor-pointer"
+                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-amber-600 text-bone hover:bg-amber-500 disabled:opacity-50 transition-all cursor-pointer"
                   >
                     {isSwitching ? "Switching networks..." : "Switch to Mantle Sepolia"}
                   </button>
@@ -830,7 +864,7 @@ export default function Dashboard() {
                     <button
                       onClick={submitCreateBounty}
                       disabled={isCreating || isConfirming || !createForm.targetContract.startsWith("0x")}
-                      className="w-full py-3.5 rounded-xl font-bold text-sm bg-linear-to-r from-cyan-500 to-purple-600 text-white hover:from-cyan-400 hover:to-purple-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                      className="w-full py-3.5 rounded-xl font-bold text-sm bg-linear-to-r from-bronze-500 to-bronze-600 text-ash hover:from-bronze-400 hover:to-bronze-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
                     >
                       {isCreating ? "Confirm in Wallet..." : isConfirming ? "Confirming tx..." : `Deposit Escrow & Deploy · ${createForm.rewardMnt || "0"} MNT`}
                     </button>

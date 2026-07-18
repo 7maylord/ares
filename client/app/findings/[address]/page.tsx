@@ -27,10 +27,10 @@ interface Finding {
 const SEVERITY_RANK: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1, Informational: 0 };
 
 function severityColors(s: string) {
-  if (s === "Critical") return { bar: "bg-rose-500", badge: "bg-rose-500/10 text-rose-400 border-rose-500/20", border: "border-rose-500/25" };
+  if (s === "Critical") return { bar: "bg-blood-500", badge: "bg-blood-500/10 text-blood-400 border-blood-500/20", border: "border-blood-500/25" };
   if (s === "High")     return { bar: "bg-orange-500", badge: "bg-orange-500/10 text-orange-400 border-orange-500/20", border: "border-orange-500/25" };
   if (s === "Medium")   return { bar: "bg-amber-500", badge: "bg-amber-500/10 text-amber-400 border-amber-500/20", border: "border-amber-500/25" };
-  return { bar: "bg-blue-500", badge: "bg-blue-500/10 text-blue-400 border-blue-500/20", border: "border-blue-500/20" };
+  return { bar: "bg-verdigris-500", badge: "bg-verdigris-500/10 text-verdigris-400 border-verdigris-500/20", border: "border-verdigris-500/20" };
 }
 
 export default function FindingsDetailPage({ params }: { params: Promise<{ address: string }> }) {
@@ -57,7 +57,7 @@ export default function FindingsDetailPage({ params }: { params: Promise<{ addre
   const isVerified = findings.some((f) => f.status === "Verified");
 
   return (
-    <main className="min-h-screen bg-[#09090b] text-zinc-100 p-6 md:p-10 max-w-5xl mx-auto">
+    <main className="min-h-screen bg-ash text-bone font-plex p-6 md:p-10 max-w-5xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300 text-sm transition-colors mb-6">
@@ -75,7 +75,7 @@ export default function FindingsDetailPage({ params }: { params: Promise<{ addre
               </span>
             )}
             {isVerified && (
-              <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-bold">
+              <span className="text-[10px] font-mono bg-verdigris-500/10 text-verdigris-400 border border-verdigris-500/20 px-2 py-0.5 rounded font-bold">
                 VERIFIED
               </span>
             )}
@@ -94,7 +94,7 @@ export default function FindingsDetailPage({ params }: { params: Promise<{ addre
                 href={`https://sepolia.mantlescan.xyz/tx/${submissionTx}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1.5 text-cyan-400 font-mono text-xs hover:underline"
+                className="flex items-center gap-1.5 text-bronze-400 font-mono text-xs hover:underline"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                 Submission Tx: {submissionTx.slice(0, 14)}...{submissionTx.slice(-10)}
@@ -105,7 +105,7 @@ export default function FindingsDetailPage({ params }: { params: Promise<{ addre
                 href={`https://sepolia.mantlescan.xyz/tx/${payoutTx}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1.5 text-emerald-400 font-mono text-xs hover:underline"
+                className="flex items-center gap-1.5 text-verdigris-400 font-mono text-xs hover:underline"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                 Payout Tx: {payoutTx.slice(0, 14)}...{payoutTx.slice(-10)}
@@ -160,7 +160,7 @@ export default function FindingsDetailPage({ params }: { params: Promise<{ addre
                     {f.pocSketch && (
                       <div>
                         <h3 className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-2">PoC Sketch</h3>
-                        <pre className="text-zinc-400 text-xs italic leading-relaxed font-mono bg-zinc-950/60 p-3 rounded-lg border border-zinc-800 whitespace-pre-wrap">{f.pocSketch}</pre>
+                        <pre className="text-zinc-400 text-xs italic leading-relaxed font-mono bg-ash/60 p-3 rounded-lg border border-zinc-800 whitespace-pre-wrap">{f.pocSketch}</pre>
                       </div>
                     )}
 
@@ -168,7 +168,7 @@ export default function FindingsDetailPage({ params }: { params: Promise<{ addre
                     {f.remediation && (
                       <div>
                         <h3 className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-2">Remediation</h3>
-                        <pre className="text-zinc-300 text-xs leading-relaxed font-mono bg-zinc-950/60 p-3 rounded-lg border border-zinc-800 whitespace-pre-wrap">{f.remediation}</pre>
+                        <pre className="text-zinc-300 text-xs leading-relaxed font-mono bg-ash/60 p-3 rounded-lg border border-zinc-800 whitespace-pre-wrap">{f.remediation}</pre>
                       </div>
                     )}
                   </div>

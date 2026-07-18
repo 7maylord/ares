@@ -5,6 +5,8 @@ import { mantleSepoliaTestnet } from 'viem/chains';
 
 export interface FetchedContract {
   sourceCode?: string;
+  /** Raw per-file sources from Mantlescan multi-file JSON — present when isVerified and >1 file */
+  rawSources?: Record<string, string>;
   bytecode?: string;
   isVerified: boolean;
   contractName?: string;
@@ -92,27 +94,31 @@ export class ContractFetcherService {
 
       // Handle multi-file source (Etherscan JSON format)
       let sourceCode = result.SourceCode;
+      let rawSources: Record<string, string> | undefined;
+
       if (sourceCode.startsWith('{{')) {
-        // Multi-file JSON format: {{...}} — strip outer braces and parse
         try {
-          const inner = sourceCode.slice(1, -1); // Remove outer { }
+          const inner = sourceCode.slice(1, -1);
           const parsed = JSON.parse(inner);
           const sources = parsed.sources || parsed;
-          // Concatenate all source files
-          sourceCode = Object.entries(sources)
-            .map(([filename, content]: [string, any]) => {
-              const code = typeof content === 'string' ? content : content.content;
-              return `// File: ${filename}\n${code}`;
-            })
+          rawSources = Object.fromEntries(
+            Object.entries(sources).map(([filename, content]: [string, any]) => [
+              filename,
+              typeof content === 'string' ? content : content.content,
+            ])
+          );
+          // Concatenated string kept for LLM RAG (it reads text, not files)
+          sourceCode = Object.entries(rawSources)
+            .map(([filename, code]) => `// File: ${filename}\n${code}`)
             .join('\n\n');
         } catch {
-          // If parsing fails, use raw source
           this.logger.warn('Failed to parse multi-file source, using raw');
         }
       }
 
       return {
         sourceCode,
+        rawSources,
         isVerified: true,
         contractName: result.ContractName || undefined,
         compilerVersion: result.CompilerVersion || undefined,

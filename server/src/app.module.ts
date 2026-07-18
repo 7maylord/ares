@@ -14,6 +14,7 @@ import { TargetEntity } from './database/entities/target.entity';
 import { BountyEntity } from './database/entities/bounty.entity';
 import { FindingEntity } from './database/entities/finding.entity';
 import { EventLogEntity } from './database/entities/event-log.entity';
+import { UsedTxHashEntity } from './database/entities/used-tx-hash.entity';
 
 @Module({
   imports: [
@@ -24,7 +25,7 @@ import { EventLogEntity } from './database/entities/event-log.entity';
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
-        entities: [TargetEntity, BountyEntity, FindingEntity, EventLogEntity],
+        entities: [TargetEntity, BountyEntity, FindingEntity, EventLogEntity, UsedTxHashEntity],
         synchronize: true,
         ssl: { rejectUnauthorized: false },
       }),

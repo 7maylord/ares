@@ -1,0 +1,24 @@
+{
+  "type": "erc-8004/agent@1.0",
+  "name": "Ares",
+  "description": "Autonomous smart contract bug bounty hunter on Mantle. Watches for on-chain bounties, analyzes target contracts using Slither static analysis and LLM-augmented reasoning, and submits verified vulnerability findings as on-chain transactions — earning MNT rewards and building verifiable reputation.",
+  "image": "https://ares-x.vercel.app/logo.png",
+  "services": [
+    {
+      "type": "web",
+      "url": "https://ares-x.vercel.app"
+    }
+  ],
+  "active": true,
+  "supportedTrust": ["reputation"],
+  "registrations": [
+    {
+      "chainId": 5003,
+      "contracts": {
+        "reputationLedger": "0x2986f9236991f156aefb94f369551a95e67f0acc",
+        "bountyPool": "0x9bc25b223787ce045e8b5c19a2547b3b1ebda1d8",
+        "bountyEscrow": "0x084d072416984f89d9dff6548a357c88ae7a39fe"
+      }
+    }
+  ]
+}
