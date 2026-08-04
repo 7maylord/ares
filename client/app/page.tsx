@@ -994,10 +994,6 @@ contract AttackVault {
           <div>
             <span>© 2026 Ares Protocol — Autonomous Bug Bounty Auditor.</span>
           </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-2 justify-center">
-            <span>Deployed on Mantle Sepolia</span>
-            <span>Built with NestJS, FastAPI &amp; DeepSeek</span>
-          </div>
         </div>
       </footer>
     </div>
