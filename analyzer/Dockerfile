@@ -37,8 +37,11 @@ RUN pip install --no-cache-dir -r analyzer/requirements.txt
 COPY . ./analyzer/
 RUN chmod +x analyzer/entrypoint.sh
 
-# --- Persistent volumes ---
-VOLUME ["/workspace/analyzer/rag/chroma_db", "/workspace/analyzer/rag/training_data"]
+# --- Persistent data dirs ---
+# No Dockerfile VOLUME: Railway rejects it. Persist by attaching a Railway Volume
+# to each mount path below in the service settings (see notes). mkdir keeps the app
+# working when no volume is attached (ChromaDB re-ingests on boot).
+RUN mkdir -p /workspace/analyzer/rag/chroma_db /workspace/analyzer/rag/training_data
 
 EXPOSE 8000
 
