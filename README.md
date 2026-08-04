@@ -22,7 +22,7 @@ ContractFetcherService
         ▼
 Python Analyzer  POST /analyze
   ├── Slither — deterministic static analysis
-  └── LLM RAG — Claude + 62,000 real audit findings (ChromaDB)
+  └── LLM RAG — DeepSeek + 62,000 real audit findings (ChromaDB)
         │
         ▼
 SubmitterService → BountyPool.submitFinding()        (on-chain tx)
@@ -162,7 +162,7 @@ Slither runs on the Solidity source (real or decompiled). It detects common vuln
 
 **Step 3 — LLM RAG analysis**
 
-Queries ChromaDB for the 5 most semantically similar past audit findings (from Code4rena, Sherlock, and Solodit competitions). These are injected as context into a Claude prompt (or Ollama if Claude is unavailable). The LLM reasons about the contract's vulnerabilities with real-world precedent, producing structured JSON output with title, severity, category, location, description, PoC sketch, and remediation.
+Queries ChromaDB for the 5 most semantically similar past audit findings (from Code4rena, Sherlock, and Solodit competitions). These are injected as context into a DeepSeek prompt (or Ollama if DeepSeek is unavailable). The LLM reasons about the contract's vulnerabilities with real-world precedent, producing structured JSON output with title, severity, category, location, description, PoC sketch, and remediation.
 
 **Step 4 — Merge and return**
 
@@ -172,11 +172,11 @@ Both result sets are merged, deduplicated, and returned as a unified JSON respon
 
 | Priority | Backend | Trigger |
 |----------|---------|---------|
-| 1 | Anthropic Claude (`claude-sonnet-4-6`) | `ANTHROPIC_API_KEY` is set |
+| 1 | DeepSeek (`deepseek-v4-flash`) | `DEEPSEEK_API_KEY` is set |
 | 2 | Ollama (local) | `OLLAMA_BASE_URL` or `OLLAMA_MODEL` is set |
 | 3 | None (Slither only) | Neither key is set |
 
-Set `DISABLE_RAG=true` to skip ChromaDB entirely and run with Slither + Claude only (fits in 512 MB RAM — useful for constrained environments).
+Set `DISABLE_RAG=true` to skip ChromaDB entirely and run with Slither + DeepSeek only (fits in 512 MB RAM — useful for constrained environments).
 
 ### Other endpoints
 
@@ -273,7 +273,7 @@ Copy `server/.env.sample` to `server/.env`:
 | `REPUTATION_ADDRESS` | Yes | Deployed `ReputationLedger` contract address |
 | `AGENT_PRIVATE_KEY` | Yes | Private key for the Ares agent wallet — never use your main wallet |
 | `ANALYZER_SERVICE_URL` | Yes | URL of the Python analyzer (default: `http://localhost:8000`) |
-| `ANTHROPIC_API_KEY` | No | Claude API key — falls back to Ollama or Slither-only if unset |
+| `DEEPSEEK_API_KEY` | No | DeepSeek API key — falls back to Ollama or Slither-only if unset |
 | `PAYMENT_ADDRESS` | No | Address that receives MNT for `POST /audit` (default: ReputationLedger address) |
 
 ---
@@ -377,7 +377,7 @@ rm -rf analyzer/rag/.cache/   # delete ~7 GB clone cache after
 uvicorn analyzer.main:app --port 8000 --reload
 ```
 
-Skip ingest and run without RAG (Slither + Claude only, minimal RAM):
+Skip ingest and run without RAG (Slither + DeepSeek only, minimal RAM):
 
 ```bash
 DISABLE_RAG=true uvicorn analyzer.main:app --port 8000 --reload
@@ -462,7 +462,7 @@ The endpoint is intentionally machine-friendly. An agent can fund itself with MN
 
 ## Re-triggering Analysis
 
-If a bounty was processed before Claude credits were topped up, or you want to re-analyze a contract:
+If a bounty was processed before DeepSeek credits were topped up, or you want to re-analyze a contract:
 
 ```bash
 curl -X POST http://localhost:3001/analysis/trigger \

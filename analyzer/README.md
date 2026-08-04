@@ -6,7 +6,7 @@ Python microservice that performs smart contract security analysis. Exposes a Fa
 
 - **FastAPI** — HTTP server
 - **Slither** — static analysis on Solidity source
-- **LLM RAG** — Claude (Anthropic) + ChromaDB vector store seeded with past audit findings (Solodit, Code4rena, Sherlock)
+- **LLM RAG** — DeepSeek + ChromaDB vector store seeded with past audit findings (Solodit, Code4rena, Sherlock)
 - **Heimdall** — bytecode decompiler (fallback when no verified source is available)
 - **solc-select** — manages multiple Solidity compiler versions for Slither
 
@@ -16,11 +16,11 @@ Priority order — first available is used:
 
 | Backend | Env var required | Notes |
 |---------|-----------------|-------|
-| Anthropic Claude | `ANTHROPIC_API_KEY` | Best quality, paid API |
+| DeepSeek | `DEEPSEEK_API_KEY` | Best quality, paid API |
 | Ollama (local) | `OLLAMA_BASE_URL` + `OLLAMA_MODEL` | Free, runs on your machine |
 | None | — | Slither still runs; LLM findings disabled |
 
-If Claude fails mid-request, Ollama is tried automatically as a fallback.
+If DeepSeek fails mid-request, Ollama is tried automatically as a fallback.
 
 **Ollama quick start:**
 ```bash
@@ -85,18 +85,18 @@ pip install -r requirements.txt
 solc-select install 0.8.20 && solc-select use 0.8.20
 
 # Set env vars
-export ANTHROPIC_API_KEY=sk-ant-...
+export DEEPSEEK_API_KEY=sk-...
 
 uvicorn analyzer.main:app --reload --port 8000
 ```
 
-The server starts at `http://localhost:8000`. LLM RAG analysis is disabled if `ANTHROPIC_API_KEY` is unset — Slither still runs.
+The server starts at `http://localhost:8000`. LLM RAG analysis is disabled if `DEEPSEEK_API_KEY` is unset — Slither still runs.
 
 ## Docker
 
 ```bash
 docker build -t ares-analyzer .
-docker run -p 8000:8000 -e ANTHROPIC_API_KEY=sk-ant-... ares-analyzer
+docker run -p 8000:8000 -e DEEPSEEK_API_KEY=sk-... ares-analyzer
 ```
 
 Or via the root `docker-compose.yml`:

@@ -996,7 +996,7 @@ contract AttackVault {
           </div>
           <div className="flex flex-wrap gap-x-6 gap-y-2 justify-center">
             <span>Deployed on Mantle Sepolia</span>
-            <span>Built with NestJS, FastAPI &amp; Claude 3.5</span>
+            <span>Built with NestJS, FastAPI &amp; DeepSeek</span>
           </div>
         </div>
       </footer>

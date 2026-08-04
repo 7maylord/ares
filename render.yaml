@@ -10,7 +10,7 @@ services:
     dockerContext: ./analyzer
     plan: standard                 # starter has too little RAM for embedding model
     envVars:
-      - key: ANTHROPIC_API_KEY
+      - key: DEEPSEEK_API_KEY
         sync: false                # paste value in Render dashboard
       - key: GITHUB_TOKEN
         sync: false                # optional — raises GitHub rate limit to 5000/hr
@@ -47,7 +47,7 @@ services:
         value: "0x2986F9236991F156aEfB94F369551a95E67F0aCc"
       - key: AGENT_PRIVATE_KEY
         sync: false
-      - key: ANTHROPIC_API_KEY
+      - key: DEEPSEEK_API_KEY
         sync: false
       - key: PAYMENT_ADDRESS
         value: "0x2986F9236991F156aEfB94F369551a95E67F0aCc"

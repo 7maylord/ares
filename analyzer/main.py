@@ -37,8 +37,8 @@ poc_validator = PoCValidator()
 # Lazy load LLM RAG runner only if API key is present, to prevent crash on startup if missing
 try:
     llm_rag_runner = LLMRagRunner()
-    # LLMRagRunner logs its own backend selection (Claude / Ollama / none)
-    if not os.getenv("ANTHROPIC_API_KEY") and not os.getenv("OLLAMA_MODEL"):
+    # LLMRagRunner logs its own backend selection (DeepSeek / Ollama / none)
+    if not os.getenv("DEEPSEEK_API_KEY") and not os.getenv("OLLAMA_MODEL"):
         llm_rag_runner = None
 except Exception as e:
     logger.error(f"Failed to initialize LLM RAG runner: {e}")

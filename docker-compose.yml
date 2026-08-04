@@ -24,7 +24,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       INGEST_SINCE: ${INGEST_SINCE:-2021-01-01}
       INGEST_MAX_REPOS: ${INGEST_MAX_REPOS:-200}
@@ -58,7 +59,7 @@ services:
       POOL_ADDRESS: ${POOL_ADDRESS}
       ESCROW_ADDRESS: ${ESCROW_ADDRESS}
       AGENT_PRIVATE_KEY: ${AGENT_PRIVATE_KEY}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       ANALYZER_SERVICE_URL: http://analyzer:8000
       # FUTURE: restore when Redis is re-enabled
       # REDIS_HOST: redis

@@ -6,7 +6,7 @@ slither-analyzer==0.9.3
 solc-select==1.0.4
 
 # RAG / LLM dependencies
-anthropic>=0.100.0
+# (DeepSeek is called over its OpenAI-compatible REST API via httpx — no SDK needed)
 chromadb>=1.0.0
 beautifulsoup4>=4.12.0
 httpx>=0.27.0

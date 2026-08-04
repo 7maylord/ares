@@ -5,9 +5,9 @@ Retrieves similar audit findings from ChromaDB and uses an LLM
 to reason about potential vulnerabilities in a target contract.
 
 LLM priority:
-  1. Anthropic Claude  — if ANTHROPIC_API_KEY is set
-  2. Ollama (local)    — if OLLAMA_BASE_URL or OLLAMA_MODEL is set
-  3. No LLM           — returns empty findings (Slither still runs)
+  1. DeepSeek        — if DEEPSEEK_API_KEY is set
+  2. Ollama (local)  — if OLLAMA_BASE_URL or OLLAMA_MODEL is set
+  3. No LLM          — returns empty findings (Slither still runs)
 """
 
 import json
@@ -24,6 +24,11 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 DB_DIR = os.path.join(os.path.dirname(__file__), "..", "rag", "chroma_db")
+
+# DeepSeek exposes an OpenAI-style /chat/completions endpoint — a plain REST call.
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:8b")
@@ -71,7 +76,7 @@ def _parse_llm_response(raw: str) -> list[dict]:
     if not content:
         logger.warning("LLM returned empty response")
         return []
-    # If Claude prefixed the JSON with explanation text, find the array/object
+    # If the model prefixed the JSON with explanation text, find the array/object
     if not content.startswith(("[", "{")):
         start = content.find("[")
         obj_start = content.find("{")
@@ -91,15 +96,14 @@ def _parse_llm_response(raw: str) -> list[dict]:
 
 class LLMRagRunner:
     def __init__(self):
-        self.anthropic_client = None
+        self._deepseek_available = False
         self._ollama_available = False
         self.chroma_client = None
         self.collection = None
 
-        if os.getenv("ANTHROPIC_API_KEY"):
-            import anthropic
-            self.anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-            logger.info("LLM backend: Anthropic Claude")
+        if DEEPSEEK_API_KEY:
+            self._deepseek_available = True
+            logger.info(f"LLM backend: DeepSeek ({DEEPSEEK_MODEL})")
         else:
             self._ollama_available = self._check_ollama()
             if self._ollama_available:
@@ -145,18 +149,30 @@ class LLMRagRunner:
             logger.warning(f"ChromaDB query failed: {e}")
             return []
 
-    def _call_claude(self, user_prompt: str) -> list[dict]:
-        import anthropic
-        response = self.anthropic_client.messages.create(
-            model="claude-sonnet-4-6",
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_prompt}],
-            temperature=0.1,
-            max_tokens=4000,
+    def _call_deepseek(self, user_prompt: str) -> list[dict]:
+        resp = httpx.post(
+            f"{DEEPSEEK_BASE_URL}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": DEEPSEEK_MODEL,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": 0.1,
+                "max_tokens": 4000,
+                "stream": False,
+            },
+            timeout=180,
         )
-        raw = response.content[0].text if response.content else ""
-        if response.stop_reason == "max_tokens":
-            logger.warning("Claude hit max_tokens — response may be truncated")
+        resp.raise_for_status()
+        choice = resp.json()["choices"][0]
+        raw = choice["message"]["content"] or ""
+        if choice.get("finish_reason") == "length":
+            logger.warning("DeepSeek hit max_tokens — response may be truncated")
         return _parse_llm_response(raw)
 
     def _call_ollama(self, user_prompt: str) -> list[dict]:
@@ -170,7 +186,7 @@ class LLMRagRunner:
         return _parse_llm_response(resp.json()["response"])
 
     def analyze(self, source_code: str) -> list[dict]:
-        if not self.anthropic_client and not self._ollama_available:
+        if not self._deepseek_available and not self._ollama_available:
             return []
 
         similar_findings = self.retrieve_similar_findings(source_code)
@@ -188,14 +204,14 @@ class LLMRagRunner:
         )
 
         try:
-            if self.anthropic_client:
-                return self._call_claude(user_prompt)
+            if self._deepseek_available:
+                return self._call_deepseek(user_prompt)
             return self._call_ollama(user_prompt)
         except Exception as e:
             logger.error(f"LLM analysis failed: {e}")
-            # If Claude failed, try Ollama as emergency fallback
-            if self.anthropic_client and self._check_ollama():
-                logger.info("Falling back to Ollama after Claude error")
+            # If DeepSeek failed, try Ollama as emergency fallback
+            if self._deepseek_available and self._check_ollama():
+                logger.info("Falling back to Ollama after DeepSeek error")
                 try:
                     return self._call_ollama(user_prompt)
                 except Exception as e2:
