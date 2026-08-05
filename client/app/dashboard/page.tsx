@@ -43,7 +43,7 @@ interface Bounty {
   severityThreshold: string;
   deadline: string;
   active: boolean;
-  status: "PENDING" | "ANALYZING" | "SECURE" | "VULNERABLE" | "SUBMITTED" | "VERIFIED";
+  status: "PENDING" | "ANALYZING" | "SECURE" | "INCONCLUSIVE" | "VULNERABLE" | "SUBMITTED" | "VERIFIED";
   scannedAt?: string;
   vulnerabilitiesFound?: number;
   createdAt: string;
@@ -230,6 +230,7 @@ export default function Dashboard() {
       ANALYZING:  "bg-bronze-500/10 text-bronze-400 border-bronze-500/25",
       VULNERABLE: "bg-blood-500/10 text-blood-400 border-blood-500/25",
       SUBMITTED:  "bg-amber-500/10 text-amber-400 border-amber-500/25",
+      INCONCLUSIVE: "bg-zinc-700/25 text-zinc-300 border-zinc-600/40",
       PENDING:    "bg-zinc-800 text-zinc-400 border-zinc-700",
     };
     return `text-[10px] px-2 py-0.5 rounded-full font-mono font-medium border ${map[status] ?? map.PENDING}`;

@@ -40,6 +40,16 @@ export class AnalysisProcessor {
     private readonly eventsService: EventsService,
   ) {}
 
+  /**
+   * Status to record when no vulnerabilities were returned. Only a clean scan of
+   * VERIFIED source earns SECURE. A null result (analyzer error) or a
+   * decompiled/bytecode-only scan can't clear a contract — that's INCONCLUSIVE,
+   * never a false "secure".
+   */
+  private cleanResultStatus(result: { source_type?: string } | null | undefined): 'SECURE' | 'INCONCLUSIVE' {
+    return result?.source_type === 'verified_source' ? 'SECURE' : 'INCONCLUSIVE';
+  }
+
   async runProject(bountyId: number, targetContracts: string[], poolAddress: string): Promise<void> {
     const primaryContract = targetContracts[0];
     this.logger.log(`Processing project analysis for bounty ${bountyId} → [${targetContracts.join(', ')}]`);
@@ -112,10 +122,13 @@ export class AnalysisProcessor {
       await Promise.all(savedFindings.map((f) => this.findingsService.updateById(f.id, { txHash })));
       await this.bountiesService.updateByBountyId(bountyId, { status: 'SUBMITTED' });
     } else {
-      await this.bountiesService.updateByBountyId(bountyId, { status: 'SECURE', vulnerabilitiesFound: 0, scannedAt });
+      const status = this.cleanResultStatus(result);
+      await this.bountiesService.updateByBountyId(bountyId, { status, vulnerabilitiesFound: 0, scannedAt });
       await this.eventsService.log(
         'AnalysisStarted',
-        `Ares Agent found no vulnerabilities in Bounty #${bountyId} — project appears secure`,
+        status === 'SECURE'
+          ? `Ares Agent found no vulnerabilities in Bounty #${bountyId} — project appears secure`
+          : `Ares Agent could not conclusively audit Bounty #${bountyId} — source unverified or decompilation inconclusive`,
       );
     }
   }
@@ -134,8 +147,8 @@ export class AnalysisProcessor {
     // Fetch contract source / bytecode
     const fetched = await this.contractFetcherService.fetchContract(targetContract);
     if (!fetched.sourceCode && !fetched.bytecode) {
-      this.logger.warn(`No code found for ${targetContract} — skipping`);
-      await this.bountiesService.updateByBountyId(bountyId, { status: 'SECURE', vulnerabilitiesFound: 0, scannedAt: new Date() });
+      this.logger.warn(`No code found for ${targetContract} — cannot audit`);
+      await this.bountiesService.updateByBountyId(bountyId, { status: 'INCONCLUSIVE', vulnerabilitiesFound: 0, scannedAt: new Date() });
       return;
     }
 
@@ -201,17 +214,20 @@ export class AnalysisProcessor {
       await this.bountiesService.updateByBountyId(bountyId, { status: 'SUBMITTED' });
 
     } else {
-      this.logger.log(`No vulnerabilities found for bounty ${bountyId}`);
+      const status = this.cleanResultStatus(result);
+      this.logger.log(`No vulnerabilities returned for bounty ${bountyId} → ${status}`);
 
       await this.bountiesService.updateByBountyId(bountyId, {
-        status: 'SECURE',
+        status,
         vulnerabilitiesFound: 0,
         scannedAt,
       });
 
       await this.eventsService.log(
         'AnalysisStarted',
-        `Ares Agent found no vulnerabilities in Bounty #${bountyId} — contract appears secure`,
+        status === 'SECURE'
+          ? `Ares Agent found no vulnerabilities in Bounty #${bountyId} — contract appears secure`
+          : `Ares Agent could not conclusively audit Bounty #${bountyId} — source unverified or decompilation inconclusive`,
       );
     }
   }

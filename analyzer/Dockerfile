@@ -13,13 +13,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Heimdall decompiler ---
-ARG HEIMDALL_VERSION=v0.8.4
-RUN curl -fsSL \
-    "https://github.com/Jon-Becker/heimdall-rs/releases/download/${HEIMDALL_VERSION}/heimdall-linux-amd64" \
-    -o /usr/local/bin/heimdall \
-    && chmod +x /usr/local/bin/heimdall \
-    || echo "Heimdall download failed — falling back to basic disassembly"
+# --- Heimdall decompiler (installed via bifrost, its official installer) ---
+# Fail loud: if the decompiler can't install, break the build rather than
+# silently shipping a scanner that can't read unverified bytecode. The old
+# direct-asset URL 404'd and the `|| echo` swallowed it, so images shipped with
+# no decompiler — every unverified contract then looked "secure".
+RUN curl -L http://get.heimdall.rs | bash \
+    && /root/.bifrost/bin/bifrost \
+    && ln -sf /root/.bifrost/bin/heimdall /usr/local/bin/heimdall \
+    && heimdall --version
 
 # --- solc ---
 RUN pip install --no-cache-dir solc-select \

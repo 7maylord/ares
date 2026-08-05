@@ -27,7 +27,7 @@ export class BountyEntity {
   active: boolean;
 
   @Column({ default: 'PENDING' })
-  status: string; // PENDING | ANALYZING | SECURE | VULNERABLE | SUBMITTED | VERIFIED
+  status: string; // PENDING | ANALYZING | SECURE | INCONCLUSIVE | VULNERABLE | SUBMITTED | VERIFIED
 
   @Column({ nullable: true })
   vulnerabilitiesFound: number;
