@@ -71,17 +71,30 @@ def decompile(bytecode: str) -> str:
 
 
 def _run_heimdall(hex_code: str) -> "str | None":
+    # heimdall >=0.9 writes to an ./output directory by default — so we MUST pass
+    # `--output print` to get it on stdout, or stdout is empty and we silently fall
+    # back to a useless opcode dump. Also: `--include-sol` for Solidity (Slither +
+    # the LLM), `--skip-resolving` (no network selector lookups), `--default`
+    # (non-interactive, never block on a prompt).
     try:
         proc = subprocess.run(
-            ["heimdall", "decompile", hex_code],
+            [
+                "heimdall", "decompile", hex_code,
+                "--output", "print",
+                "--include-sol",
+                "--skip-resolving",
+                "--default",
+            ],
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=120,
         )
         output = proc.stdout.strip()
         if proc.returncode == 0 and output:
             return output
-        logger.debug(f"Heimdall stderr: {proc.stderr[:200]}")
+        logger.warning(
+            f"Heimdall decompile produced no output (rc={proc.returncode}): {proc.stderr[:300]}"
+        )
         return None
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
         logger.warning(f"Heimdall execution error: {e}")
