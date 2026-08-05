@@ -73,16 +73,16 @@ def decompile(bytecode: str) -> str:
 def _run_heimdall(hex_code: str) -> "str | None":
     # heimdall >=0.9 writes to an ./output directory by default — so we MUST pass
     # `--output print` to get it on stdout, or stdout is empty and we silently fall
-    # back to a useless opcode dump. Also: `--include-sol` for Solidity (Slither +
-    # the LLM), `--skip-resolving` (no network selector lookups), `--default`
-    # (non-interactive, never block on a prompt).
+    # back to a useless opcode dump. `--include-sol` gives Solidity (for the LLM),
+    # `--default` runs non-interactively. We KEEP selector resolution (no
+    # --skip-resolving) so functions get real names like `withdraw` — the LLM needs
+    # those to reason about the logic.
     try:
         proc = subprocess.run(
             [
                 "heimdall", "decompile", hex_code,
                 "--output", "print",
                 "--include-sol",
-                "--skip-resolving",
                 "--default",
             ],
             capture_output=True,

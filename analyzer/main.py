@@ -116,7 +116,7 @@ def analyze_contract(request: AnalyzeRequest):
     if llm_rag_runner:
         logger.info(f"Running LLM RAG analysis on contract {request.contract_address}...")
         try:
-            llm_findings = llm_rag_runner.analyze(source)
+            llm_findings = llm_rag_runner.analyze(source, source_type)
             if isinstance(llm_findings, list):
                 for finding in llm_findings:
                     if isinstance(finding, dict):
@@ -198,7 +198,10 @@ def analyze_project(request: ProjectAnalyzeRequest):
     # LLM RAG on merged text
     if llm_rag_runner and merged_source_text.strip():
         try:
-            llm_findings = llm_rag_runner.analyze(merged_source_text)
+            llm_findings = llm_rag_runner.analyze(
+                merged_source_text,
+                "verified_source" if merged_sources else "concatenated",
+            )
             if isinstance(llm_findings, list):
                 for finding in llm_findings:
                     if isinstance(finding, dict):

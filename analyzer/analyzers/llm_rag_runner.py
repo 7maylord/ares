@@ -29,6 +29,10 @@ DB_DIR = os.path.join(os.path.dirname(__file__), "..", "rag", "chroma_db")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
+# Decompiled bytecode needs stronger reasoning than flash can manage — flash misses
+# even blatant bugs (e.g. an unprotected drain) in decompiled code, while pro catches
+# them. Use pro for non-verified (decompiled) source; keep cheap flash for real source.
+DEEPSEEK_DECOMPILE_MODEL = os.getenv("DEEPSEEK_DECOMPILE_MODEL", "deepseek-v4-pro")
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:8b")
@@ -149,7 +153,7 @@ class LLMRagRunner:
             logger.warning(f"ChromaDB query failed: {e}")
             return []
 
-    def _call_deepseek(self, user_prompt: str) -> list[dict]:
+    def _call_deepseek(self, user_prompt: str, model: "str | None" = None) -> list[dict]:
         resp = httpx.post(
             f"{DEEPSEEK_BASE_URL}/chat/completions",
             headers={
@@ -157,7 +161,7 @@ class LLMRagRunner:
                 "Content-Type": "application/json",
             },
             json={
-                "model": DEEPSEEK_MODEL,
+                "model": model or DEEPSEEK_MODEL,
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},
@@ -185,9 +189,11 @@ class LLMRagRunner:
         resp.raise_for_status()
         return _parse_llm_response(resp.json()["response"])
 
-    def analyze(self, source_code: str) -> list[dict]:
+    def analyze(self, source_code: str, source_type: str = "verified_source") -> list[dict]:
         if not self._deepseek_available and not self._ollama_available:
             return []
+
+        decompiled = source_type in ("decompiled", "bytecode_only")
 
         similar_findings = self.retrieve_similar_findings(source_code)
         context_block = ""
@@ -197,15 +203,26 @@ class LLMRagRunner:
                 + "\n\n---\n\n".join(similar_findings)
             )
 
+        # Decompiled source is noisy: names may be generic and heimdall renders raw
+        # low-level calls as `.transfer(...)`. Steer the model past those artifacts.
+        decompile_note = (
+            "\n\nNOTE: this source was DECOMPILED from bytecode. Names may be generic, and a "
+            "`.transfer(...)` of the full balance is really a raw low-level call (reentrancy-capable). "
+            "Judge access control by whether public/external functions restrict msg.sender; focus on logic."
+            if decompiled else ""
+        )
+
         user_prompt = (
             f"Analyze the following Solidity smart contract for security vulnerabilities.\n\n"
             f"## TARGET CONTRACT SOURCE CODE\n```solidity\n{source_code}\n```"
-            f"{context_block}\n\nReturn your analysis as a JSON array."
+            f"{context_block}{decompile_note}\n\nReturn your analysis as a JSON array."
         )
+
+        model = DEEPSEEK_DECOMPILE_MODEL if decompiled else DEEPSEEK_MODEL
 
         try:
             if self._deepseek_available:
-                return self._call_deepseek(user_prompt)
+                return self._call_deepseek(user_prompt, model)
             return self._call_ollama(user_prompt)
         except Exception as e:
             logger.error(f"LLM analysis failed: {e}")
