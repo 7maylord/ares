@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import os
@@ -12,6 +12,23 @@ from analyzer.poc_validator import PoCValidator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ── Internal auth ──────────────────────────────────────────────────────────
+# Only callers presenting the shared key may hit the expensive endpoints, so the
+# public URL can't be used to burn Slither/DeepSeek compute. GET / (health) stays
+# open for the Railway healthcheck. Enforced only when ANALYZER_API_KEY is set.
+ANALYZER_API_KEY = os.getenv("ANALYZER_API_KEY")
+if not ANALYZER_API_KEY:
+    logger.warning(
+        "ANALYZER_API_KEY not set — analyzer endpoints are UNPROTECTED. "
+        "Set it here and set the same value on the server to restrict access."
+    )
+
+
+def require_internal_key(x_ares_key: Optional[str] = Header(default=None)):
+    if ANALYZER_API_KEY and x_ares_key != ANALYZER_API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
 
 app = FastAPI(
     title="Ares Analyzer Microservice",
@@ -44,7 +61,7 @@ except Exception as e:
     logger.error(f"Failed to initialize LLM RAG runner: {e}")
     llm_rag_runner = None
 
-app.include_router(feedback_router)
+app.include_router(feedback_router, dependencies=[Depends(require_internal_key)])
 
 @app.get("/")
 def read_root():
@@ -53,7 +70,7 @@ def read_root():
         "llm_rag_enabled": llm_rag_runner is not None
     }
 
-@app.post("/analyze", response_model=AnalyzeResponse)
+@app.post("/analyze", response_model=AnalyzeResponse, dependencies=[Depends(require_internal_key)])
 def analyze_contract(request: AnalyzeRequest):
     if not request.source_code and not request.bytecode:
         raise HTTPException(status_code=400, detail="Must provide either source_code or bytecode")
@@ -128,7 +145,7 @@ class ProjectAnalyzeRequest(BaseModel):
     contracts: List[AnalyzeRequest]
 
 
-@app.post("/analyze-project")
+@app.post("/analyze-project", dependencies=[Depends(require_internal_key)])
 def analyze_project(request: ProjectAnalyzeRequest):
     """
     Analyze multiple related contracts (e.g. Router → Vault → Strategy).
@@ -203,7 +220,7 @@ class IngestRequest(BaseModel):
     max_repos: Optional[int] = 60
 
 
-@app.post("/ingest")
+@app.post("/ingest", dependencies=[Depends(require_internal_key)])
 def trigger_ingest(request: IngestRequest):
     """
     Trigger knowledge base population from all audit sources.

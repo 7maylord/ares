@@ -14,6 +14,7 @@ export class FeedbackService implements OnModuleInit {
   private escrowAbi: any;
   private readonly ESCROW_ADDRESS: string;
   private readonly analyzerUrl: string;
+  private readonly analyzerKey?: string;
 
   constructor(
     private readonly configService: ConfigService,
@@ -30,6 +31,7 @@ export class FeedbackService implements OnModuleInit {
       throw new Error('ANALYZER_SERVICE_URL environment variable is not defined');
     }
     this.analyzerUrl = analyzerUrl;
+    this.analyzerKey = this.configService.get<string>('ANALYZER_API_KEY');
 
     this.client = createPublicClient({
       chain: mantleTestnet,
@@ -101,10 +103,13 @@ export class FeedbackService implements OnModuleInit {
   private async sendFeedback(findingId: number, verified: boolean): Promise<void> {
     try {
       await firstValueFrom(
-        this.httpService.post(`${this.analyzerUrl}/feedback`, {
-          finding_id: findingId,
-          verified,
-        }),
+        this.httpService.post(
+          `${this.analyzerUrl}/feedback`,
+          { finding_id: findingId, verified },
+          this.analyzerKey
+            ? { headers: { 'x-ares-key': this.analyzerKey } }
+            : undefined,
+        ),
       );
       this.logger.log(
         `Feedback sent to analyzer for finding ${findingId}: ${verified ? 'true positive' : 'false positive'}`,

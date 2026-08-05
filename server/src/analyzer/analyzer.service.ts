@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 export class AnalyzerService {
   private readonly logger = new Logger(AnalyzerService.name);
   private readonly analyzerUrl: string;
+  private readonly analyzerKey?: string;
 
   constructor(
     private readonly configService: ConfigService,
@@ -17,6 +18,14 @@ export class AnalyzerService {
       throw new Error('ANALYZER_SERVICE_URL environment variable is not defined');
     }
     this.analyzerUrl = url;
+    this.analyzerKey = this.configService.get<string>('ANALYZER_API_KEY');
+  }
+
+  // Shared-secret header so the analyzer accepts calls only from this server.
+  private authConfig() {
+    return this.analyzerKey
+      ? { headers: { 'x-ares-key': this.analyzerKey } }
+      : undefined;
   }
 
   async analyzeContract(
@@ -33,7 +42,7 @@ export class AnalyzerService {
           source_code: sourceCode || null,
           bytecode: bytecode || null,
           sources: rawSources || null,
-        }),
+        }, this.authConfig()),
       );
       return response.data;
     } catch (error) {
@@ -53,7 +62,7 @@ export class AnalyzerService {
             bytecode: c.bytecode || null,
             sources: c.rawSources || null,
           })),
-        }),
+        }, this.authConfig()),
       );
       return response.data;
     } catch (error) {

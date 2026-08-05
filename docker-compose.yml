@@ -26,6 +26,7 @@ services:
     environment:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      ANALYZER_API_KEY: ${ANALYZER_API_KEY:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       INGEST_SINCE: ${INGEST_SINCE:-2021-01-01}
       INGEST_MAX_REPOS: ${INGEST_MAX_REPOS:-200}
@@ -61,6 +62,7 @@ services:
       AGENT_PRIVATE_KEY: ${AGENT_PRIVATE_KEY}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       ANALYZER_SERVICE_URL: http://analyzer:8000
+      ANALYZER_API_KEY: ${ANALYZER_API_KEY:-}
       # FUTURE: restore when Redis is re-enabled
       # REDIS_HOST: redis
       # REDIS_PORT: 6379
