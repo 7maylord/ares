@@ -5,6 +5,7 @@ import { BlockchainController } from './blockchain.controller';
 import { AgentController } from './agent.controller';
 import { ContractFetcherService } from './contract-fetcher.service';
 import { FeedbackService } from './feedback.service';
+import { TriggerRateLimitGuard } from './trigger-rate-limit.guard';
 import { AnalysisProcessor } from '../queue/analysis.processor';
 import { AnalyzerModule } from '../analyzer/analyzer.module';
 import { SubmitterModule } from '../submitter/submitter.module';
@@ -19,7 +20,7 @@ import { EventsModule } from '../events/events.module';
 @Module({
   imports: [HttpModule, AnalyzerModule, SubmitterModule, BountiesModule, FindingsModule, EventsModule],
   controllers: [BlockchainController, AgentController],
-  providers: [BlockchainService, ContractFetcherService, FeedbackService, AnalysisProcessor],
+  providers: [BlockchainService, ContractFetcherService, FeedbackService, AnalysisProcessor, TriggerRateLimitGuard],
   exports: [ContractFetcherService],
 })
 export class BlockchainModule {}

@@ -1,8 +1,12 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, BadRequestException, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AnalysisProcessor } from '../queue/analysis.processor';
 import { BountiesService } from '../bounties/bounties.service';
+import { TriggerRateLimitGuard } from './trigger-rate-limit.guard';
 
+// Free manual-trigger endpoints — rate-limited per IP so they can't be used to
+// spam the analyzer. Paid audits go through /audit (payment-gated) instead.
+@UseGuards(TriggerRateLimitGuard)
 @Controller('analysis')
 export class BlockchainController {
   constructor(

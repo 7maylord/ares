@@ -47,7 +47,9 @@ describe('AnalyzerService', () => {
           contract_address: '0xabc',
           source_code: 'pragma solidity...',
           bytecode: '0x6080',
+          sources: null,
         },
+        undefined, // no ANALYZER_API_KEY in the mock config → no auth header
       );
       expect(result.vulnerabilities_found).toBe(1);
     });
@@ -63,6 +65,7 @@ describe('AnalyzerService', () => {
       expect(mockHttpService.post).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({ source_code: null, bytecode: null }),
+        undefined,
       );
     });
 
