@@ -182,7 +182,7 @@ describe('BlockchainService', () => {
 
     it('marks the finding Verified and bounty VERIFIED', async () => {
       await (service as any).handleFindingVerified(baseArgs, '0xverifytx');
-      expect(findingsService.updateByBountyId).toHaveBeenCalledWith(1, { status: 'Verified' });
+      expect(findingsService.updateByBountyId).toHaveBeenCalledWith(1, { status: 'Verified', payoutTxHash: '0xverifytx' });
       expect(bountiesService.updateByBountyId).toHaveBeenCalledWith(1, { status: 'VERIFIED' });
     });
 

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { SubmitterService } from './submitter.service';
+import { WalletMutex } from './wallet-mutex.service';
 
 // viem wallet client + simulateContract/writeContract are mocked so no real
 // RPC calls are made. The tests verify the service constructs and submits
@@ -38,6 +39,7 @@ describe('SubmitterService', () => {
       providers: [
         SubmitterService,
         { provide: ConfigService, useValue: mockConfigService },
+        WalletMutex, // real mutex — no deps; serializes the submit call
       ],
     }).compile();
 
