@@ -172,7 +172,7 @@ Both result sets are merged, deduplicated, and returned as a unified JSON respon
 
 | Priority | Backend | Trigger |
 |----------|---------|---------|
-| 1 | DeepSeek (`deepseek-v4-flash`) | `DEEPSEEK_API_KEY` is set |
+| 1 | DeepSeek (`deepseek-v4-pro`) | `DEEPSEEK_API_KEY` is set |
 | 2 | Ollama (local) | `OLLAMA_BASE_URL` or `OLLAMA_MODEL` is set |
 | 3 | None (Slither only) | Neither key is set |
 

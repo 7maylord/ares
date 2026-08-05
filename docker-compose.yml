@@ -25,7 +25,7 @@ services:
       - "8000:8000"
     environment:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-pro}
       DEEPSEEK_DECOMPILE_MODEL: ${DEEPSEEK_DECOMPILE_MODEL:-deepseek-v4-pro}
       ANALYZER_API_KEY: ${ANALYZER_API_KEY:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}

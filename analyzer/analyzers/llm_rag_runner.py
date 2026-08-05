@@ -28,10 +28,11 @@ DB_DIR = os.path.join(os.path.dirname(__file__), "..", "rag", "chroma_db")
 # DeepSeek exposes an OpenAI-style /chat/completions endpoint — a plain REST call.
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
-# Decompiled bytecode needs stronger reasoning than flash can manage — flash misses
-# even blatant bugs (e.g. an unprotected drain) in decompiled code, while pro catches
-# them. Use pro for non-verified (decompiled) source; keep cheap flash for real source.
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
+# Default to pro: flash can't reason over decompiled bytecode (it misses even blatant
+# bugs like an unprotected drain), so we standardize on pro. DEEPSEEK_DECOMPILE_MODEL
+# is kept as a separate knob (also pro) — set either to deepseek-v4-flash via env for
+# a cheaper tier on verified source.
 DEEPSEEK_DECOMPILE_MODEL = os.getenv("DEEPSEEK_DECOMPILE_MODEL", "deepseek-v4-pro")
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
